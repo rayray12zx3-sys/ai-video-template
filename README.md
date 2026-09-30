@@ -5,12 +5,12 @@ Provider-neutral AI video production template: design baseline, implementation, 
 <!-- PROJECT_PROGRESS:START -->
 ## Development progress
 
-**Current phase:** 🟡 I7 — Hardening and release readiness  
+**Current phase:** ✅ I7 — Hardening and release readiness COMPLETE  
 **I6 status:** **4 / 4 (100%) COMPLETE**  
-**Current work:** I7 hardening and release readiness<br>
+**Current work:** Public canonical repository operational<br>
 **Current validation mode:** GitHub Actions for hosted checks; record local CI-equivalent verification separately<br>
-**Current blocker:** Final I7 release-readiness gates remain open<br>
-**Next action:** complete the remaining I7 readiness checks and record their evidence<br>
+**Current blocker:** None for I7 closeout<br>
+**Next action:** resume product implementation and controlled provider/pilot work under the public-first operating model<br>
 **I6 evidence:** I6a–I6d complete; local Windows Python 3.11/3.14 CI-equivalent validation passed<br>
 **Last verified:** 2026-09-30
 
@@ -22,13 +22,13 @@ Provider-neutral AI video production template: design baseline, implementation, 
    ├─ ✅ I6b  Importer + dry-run
    ├─ ✅ I6c  Safe canonical adoption
    └─ ✅ I6d  Replay verification
-🟡 I7      Hardening / release readiness  ← CURRENT
+✅ I7      Hardening / release readiness  COMPLETE
 ```
 
 Detailed tree, scope and evidence: [PROJECT_PROGRESS.md](PROJECT_PROGRESS.md)
 <!-- PROJECT_PROGRESS:END -->
 
-Current status: `SPEC_V2_BASELINE_1 + Amendments 1-2 / I0-I6 complete / I7 hardening active / GitHub automation foundation active / AUTOMATED_ROUTER_READY`
+Current status: `SPEC_V2_BASELINE_1 + Amendments 1-2 / I0-I7 complete / public canonical repository active / GitHub automation foundation active / AUTOMATED_ROUTER_READY`
 
 Phase I0 foundation lives in `src/aivideo`, `schemas`, and `examples/minimal-project`.
 Canonical project truth is `project.yaml`; `events.jsonl` is its append-only event history.
