@@ -6,12 +6,12 @@ Last verified: 2026-09-30
 
 ## Current milestone / phase
 
-- Phase: **I7 — Hardening and release readiness**
+- Phase: **I7 — Hardening and release readiness — COMPLETE**
 - I6 phase-task progress: **4 / 4 (100%) — COMPLETE**
 - Verification progress: **I6a–I6d complete; local CI-equivalent verification is documented**
-- Current item: **I7 — Public Readiness**
+- Current item: **Post-I7 public canonical operation**
 - Current validation mode: GitHub Actions for hosted checks; record local CI-equivalent verification separately
-- Downstream dependency blocks: I7 closeout requires the remaining readiness gates below
+- Downstream dependency blocks: none for I7 closeout
 - I6 exit: satisfied; legacy migration and replay phase complete
 
 ## Compressed progress tree
@@ -25,8 +25,8 @@ flowchart TD
     I6 --> B[✅ I6b Importer + dry-run]
     B --> C[✅ I6c Safe canonical adoption]
     C --> D[✅ I6d Replay verification]
-    P --> I7[🟡 I7 Hardening / release readiness]
-    I7 --> PUB[🟡 Public Readiness · CURRENT]
+    P --> I7[✅ I7 Hardening / release readiness]
+    I7 --> PUB[✅ Public Readiness complete]
 ```
 
 ## Active path
@@ -38,7 +38,7 @@ I6  ✅ COMPLETE
 ├─ I6c safe canonical adoption  ✅
 └─ I6d replay verification  ✅
    └─ I7 hardening / release readiness
-      └─ Public Readiness  ← CURRENT
+      └─ Public Readiness  ✅ COMPLETE
 ```
 
 ## Evidence mapping
@@ -49,7 +49,7 @@ I6  ✅ COMPLETE
 | I6b | COMPLETE | Deterministic importer and dry-run completed; Windows 3.11/3.14 CI verified |
 | I6c | COMPLETE | State Engine adoption and checkpoint behavior completed; Windows 3.11/3.14 CI verified |
 | I6d | COMPLETE | Five-case sanitized replay; local Windows 3.11/3.14 CI-equivalent verification passed |
-| I7 | ACTIVE | Hardening and release-readiness work is current |
+| I7 | COMPLETE | Clean public canonical repository, public CI, PR smoke, branch protection, and security configuration complete |
 
 ## Scope discipline
 
@@ -78,3 +78,27 @@ Before I7 closes:
 - Public-tree inventory: 93 PUBLIC, 0 SANITIZE, 0 PRIVATE-REMOVE. History, GitHub metadata, licensing, and final release checks remain separate from this current-tree classification.
 - Public CI remains provider-offline and does not authenticate or perform paid generation.
 - Publication provenance is fail-closed: the sanitized tree may be exported, but inherited private Git history and hosting metadata are not publication inputs.
+
+
+## I7 closeout
+
+I7 is complete.
+
+Closeout evidence:
+
+- clean public canonical repository with fresh Git history
+- initial public root commit uses GitHub noreply identity
+- 93 tracked files, all classified PUBLIC
+- Apache License 2.0
+- Windows Python 3.11 public CI PASS
+- Windows Python 3.14 public CI PASS
+- pull-request CI smoke PASS
+- public CI remains provider-offline and uses GitHub-hosted runners
+- main branch protection requires PRs, required CI, up-to-date branches, conversation resolution, and linear history
+- force pushes and branch deletion are blocked
+- administrator bypass is disabled
+- required approvals remain 0 for solo-maintainer operation
+- Private Vulnerability Reporting, Dependabot protections, CodeQL default setup, and Push protection are enabled
+- untrusted-fork safety is fail-closed by workflow design: no provider secrets, no paid execution, no self-hosted runners, no pull_request_target
+
+The public canonical repository is now the active development repository. The former private repository remains archive/ops evidence only.
