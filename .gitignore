@@ -1,0 +1,50 @@
+# Secrets / local auth
+.env
+.env.*
+!.env.example
+secrets/
+credentials/
+*.pem
+*.key
+
+# Local runtime / caches
+.cache/
+tmp/
+temp/
+generated/
+output/
+outputs/
+node_modules/
+__pycache__/
+.pytest_cache/
+.venv/
+venv/
+
+# Heavy production media
+media/
+runtime-media/
+*.prproj
+*.aep
+
+# Local-only config overrides
+.codex/config.local.toml
+config.local.*
+*.local.yaml
+*.local.yml
+*.local.json
+*.local.toml
+local-profile.json
+environment-snapshot.local.json
+handoff.local.json
+.pending-transaction.json
+.state-engine.lock
+execution-ledger.sqlite3*
+.migration-backups/
+.import-backups/
+.import-evidence/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

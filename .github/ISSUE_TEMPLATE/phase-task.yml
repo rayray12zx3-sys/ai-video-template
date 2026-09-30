@@ -1,0 +1,71 @@
+name: Phase or implementation task
+description: Define a bounded project task with an explicit execution owner.
+title: "[Task] "
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What outcome must exist when this task is complete?
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: List what is in scope and explicitly out of scope.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: owner
+    attributes:
+      label: Execution owner
+      description: Prefer repository-hosted coordination and automation for planning and deterministic checks. Use a repository coding executor for bounded repository-only implementation; use a local executor when private machine/provider state, local execution, or high-risk recovery is required.
+      options:
+        - GitHub / general assistance
+        - GitHub Actions
+        - Repository coding executor
+        - Local executor
+        - Hybrid
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Use objective, testable completion criteria.
+      placeholder: |
+        - [ ] ...
+        - [ ] ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks and guardrails
+      description: Include paid-provider, canonical-state, migration, secrets, external-processing, or compatibility constraints.
+
+  - type: checkboxes
+    id: public_safety
+    attributes:
+      label: Public repository safety
+      description: Everything posted to this repository must be safe for public disclosure. Use SECURITY.md for vulnerabilities.
+      options:
+        - label: The Issue contains no credentials, OAuth sessions, cookies, signed URLs, private media, real account/workspace identifiers, or absolute private machine paths.
+          required: true
+        - label: Tasks requiring private/local/provider state use a local executor; only sanitized repository evidence returns to GitHub.
+          required: true
+
+  - type: checkboxes
+    id: discipline
+    attributes:
+      label: Completion discipline
+      options:
+        - label: The task is bounded and does not duplicate work GitHub can automate.
+          required: true
+        - label: A repository coding executor is selected for bounded repository-only implementation; private/local/provider work uses a local executor.
+          required: true

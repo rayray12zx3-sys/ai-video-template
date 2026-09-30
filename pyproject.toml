@@ -1,0 +1,5 @@
+[project]
+name = "ai-video-template-v2"
+version = "0.0.0"
+requires-python = ">=3.11"
+description = "Provider-neutral AI video project foundation"

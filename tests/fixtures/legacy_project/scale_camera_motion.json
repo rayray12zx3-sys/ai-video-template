@@ -1,0 +1,106 @@
+{
+  "format": "legacy-project-sanitized-v1",
+  "fixture_id": "legacy-project-scale-motion",
+  "project": {
+    "legacy_project_id": "legacy-project-scale-motion",
+    "mode_hint": "NEW_PRODUCTION",
+    "workflow_status_hint": "ACTIVE",
+    "template_version": "2.0",
+    "state_revision": 0,
+    "next_action": "Validate scale, camera, and motion replay"
+  },
+  "assets": [
+    {
+      "id": "asset-scale-motion-keyframe-01",
+      "media_type": "IMAGE",
+      "origin": "REFERENCE",
+      "content_role": "KEY_FRAME",
+      "lifecycle": "APPROVED",
+      "selected": true,
+      "sha256": "123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0",
+      "provenance": {
+        "created_at": "2025-01-01T00:00:00Z",
+        "author": "sanitized_creator"
+      },
+      "locators": [
+        {
+          "type": "LOCAL",
+          "path": "media/previs-keyframe.png",
+          "availability": "AVAILABLE"
+        }
+      ]
+    }
+  ],
+  "shots": [
+    {
+      "id": "shot-scale-motion",
+      "duration_frames": 150,
+      "intent": "24mm low-angle wide lens view of rapid structure growth lifting subject",
+      "input_asset_ids": [
+        "asset-scale-motion-keyframe-01"
+      ],
+      "production_method": "AUTO",
+      "readiness": "REQUIRED",
+      "new_media_required": true,
+      "editorial_only": false,
+      "requirements": {
+        "motion_complexity": "HIGH",
+        "structure_sensitivity": "HIGH",
+        "camera": {
+          "complex_geometry": true,
+          "lens_sensitive": true,
+          "sensitivity": "HIGH",
+          "lens_mm": 24,
+          "angle": "LOW",
+          "fisheye": "SLIGHT"
+        }
+      },
+      "constraints": {
+        "spatial_relations": [
+          {
+            "subject": "structure",
+            "relation": "supports_and_lifts",
+            "object": "subject"
+          }
+        ],
+        "key_states": [
+          "low_structure",
+          "rapid_growth_and_lift",
+          "elevated_end_state"
+        ],
+        "must_not": [
+          "distort_subject"
+        ]
+      }
+    }
+  ],
+  "dependencies": [
+    {
+      "source": "asset:asset-scale-motion-keyframe-01",
+      "target": "shot:shot-scale-motion",
+      "impact": "STRUCTURE"
+    }
+  ],
+  "selections": {
+    "shot-scale-motion-ref": "asset-scale-motion-keyframe-01"
+  },
+  "approvals": [
+    {
+      "id": "app-scale-motion-01",
+      "status": "APPROVED",
+      "actor_type": "HUMAN",
+      "subject": "shot:shot-scale-motion"
+    }
+  ],
+  "legacy_records": [
+    {
+      "type": "WORKLOG",
+      "note": "Complex camera and rapid structure motion trigger a 3D previs recommendation"
+    }
+  ],
+  "unknown_fields": {
+    "legacy_notes": [
+      "CAMERA_PREVIS_RECOMMENDED"
+    ]
+  }
+}

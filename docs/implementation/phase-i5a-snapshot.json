@@ -1,0 +1,83 @@
+{
+  "provider": "pixverse",
+  "captured_at": "2026-09-24T01:57:24+00:00",
+  "expires_at": "2026-09-24T02:57:24+00:00",
+  "freshness_policy": "refresh before ticket or paid preflight",
+  "evidence_source": "LOCAL_READ_ONLY_PROBES",
+  "evidence_surface": "UNKNOWN",
+  "surfaces": [
+    {
+      "surface": "CODEX_PLUGIN",
+      "installed": "YES",
+      "executable": "NO",
+      "authenticated": "UNKNOWN",
+      "entitled": "UNKNOWN",
+      "capability_proven": "NO",
+      "workspace_resolved": "UNKNOWN",
+      "evidence": [
+        "PLUGIN_MANIFEST_1.3.1",
+        "PVX_HELP_OK",
+        "PVX_SETUP_MISSING",
+        "PRIVATE_CLI_REQUIRED"
+      ],
+      "execution_ready": false,
+      "status": "UNAVAILABLE"
+    },
+    {
+      "surface": "RAW_CLI",
+      "installed": "NO",
+      "executable": "NO",
+      "authenticated": "UNKNOWN",
+      "entitled": "UNKNOWN",
+      "capability_proven": "NO",
+      "workspace_resolved": "UNKNOWN",
+      "evidence": [
+        "GET_COMMAND_ABSENT",
+        "NPM_NPX_ABSENT"
+      ],
+      "execution_ready": false,
+      "status": "UNAVAILABLE"
+    },
+    {
+      "surface": "WEB_MANUAL",
+      "installed": "UNKNOWN",
+      "executable": "UNKNOWN",
+      "authenticated": "UNKNOWN",
+      "entitled": "UNKNOWN",
+      "capability_proven": "UNKNOWN",
+      "workspace_resolved": "UNKNOWN",
+      "evidence": [
+        "FALLBACK_UNINSPECTED"
+      ],
+      "execution_ready": false,
+      "status": "BLOCKED"
+    }
+  ],
+  "preferred_surface": "WEB_MANUAL",
+  "installed_plugin_version": "1.3.1",
+  "technical": {
+    "backend": "WEB_MANUAL",
+    "operations": "UNKNOWN",
+    "models": "UNKNOWN",
+    "profiles": "UNKNOWN",
+    "idempotent_operations": "UNKNOWN",
+    "trace_operations": "UNKNOWN"
+  },
+  "entitlement": {
+    "authenticated": "UNKNOWN",
+    "subscription_active": "UNKNOWN",
+    "credits_available": "UNKNOWN",
+    "slots_available": "UNKNOWN"
+  },
+  "runtime": {
+    "execution_surface": "WEB_MANUAL",
+    "backend": "WEB_MANUAL",
+    "workspace_id": "UNKNOWN",
+    "plugin_version": "UNKNOWN",
+    "cli_version": "UNKNOWN",
+    "region": "UNKNOWN"
+  },
+  "canvas_live_state": "UNKNOWN",
+  "trusted_preflight": false,
+  "id": "d7e9c124d629ce3deed574168729627b0c715588f2fdfd98be000d387b54fb85"
+}

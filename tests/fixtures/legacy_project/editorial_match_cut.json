@@ -1,0 +1,104 @@
+{
+  "format": "legacy-project-sanitized-v1",
+  "fixture_id": "legacy-project-editorial-cut",
+  "project": {
+    "legacy_project_id": "legacy-project-editorial-cut",
+    "mode_hint": "NEW_PRODUCTION",
+    "workflow_status_hint": "COMPLETE",
+    "template_version": "2.0",
+    "state_revision": 0,
+    "next_action": "Validate editorial match cut routing"
+  },
+  "assets": [
+    {
+      "id": "asset-previous-clip",
+      "media_type": "VIDEO",
+      "origin": "PROVIDER_OUTPUT",
+      "content_role": "SHOT_RENDER",
+      "lifecycle": "APPROVED",
+      "selected": true,
+      "sha256": "456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123",
+      "provenance": {
+        "created_at": "2025-01-01T00:00:00Z",
+        "author": "sanitized_creator"
+      },
+      "locators": [
+        {
+          "type": "LOCAL",
+          "path": "media/previous-clip.mp4",
+          "availability": "AVAILABLE"
+        }
+      ]
+    },
+    {
+      "id": "asset-following-clip",
+      "media_type": "VIDEO",
+      "origin": "PROVIDER_OUTPUT",
+      "content_role": "SHOT_RENDER",
+      "lifecycle": "APPROVED",
+      "selected": true,
+      "sha256": "56789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234",
+      "provenance": {
+        "created_at": "2025-01-01T00:00:00Z",
+        "author": "sanitized_creator"
+      },
+      "locators": [
+        {
+          "type": "LOCAL",
+          "path": "media/following-clip.mp4",
+          "availability": "AVAILABLE"
+        }
+      ]
+    }
+  ],
+  "shots": [
+    {
+      "id": "shot-editorial-cut",
+      "duration_frames": 60,
+      "intent": "Editorial match cut transition between adjacent clips without generating new media",
+      "input_asset_ids": [
+        "asset-previous-clip",
+        "asset-following-clip"
+      ],
+      "production_method": "PREMIERE",
+      "readiness": "REQUIRED",
+      "new_media_required": false,
+      "editorial_only": true
+    }
+  ],
+  "dependencies": [
+    {
+      "source": "asset:asset-previous-clip",
+      "target": "shot:shot-editorial-cut",
+      "impact": "TIMING"
+    },
+    {
+      "source": "asset:asset-following-clip",
+      "target": "shot:shot-editorial-cut",
+      "impact": "TIMING"
+    }
+  ],
+  "selections": {
+    "match_cut_in": "asset-previous-clip",
+    "match_cut_out": "asset-following-clip"
+  },
+  "approvals": [
+    {
+      "id": "app-editorial-cut-01",
+      "status": "APPROVED",
+      "actor_type": "HUMAN",
+      "subject": "shot:shot-editorial-cut"
+    }
+  ],
+  "legacy_records": [
+    {
+      "type": "WORKLOG",
+      "note": "The match cut uses neighboring approved renders in an editorial timeline"
+    }
+  ],
+  "unknown_fields": {
+    "legacy_notes": [
+      "NO_NEW_MEDIA_ROUTE"
+    ]
+  }
+}

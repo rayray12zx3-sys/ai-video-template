@@ -1,0 +1,12 @@
+{
+  "schema_version": "2.0",
+  "template_version": "2.0",
+  "project_id": "sample-minimal",
+  "state_revision": 0,
+  "mode": "NEW_PRODUCTION",
+  "interaction_mode": "DISCOVERY",
+  "next_action": "Define project intent and shot requirements",
+  "assets": [],
+  "shots": [],
+  "dependencies": []
+}

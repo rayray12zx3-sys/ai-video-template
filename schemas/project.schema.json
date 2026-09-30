@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Canonical project I2 validation fields",
+  "type": "object",
+  "required": ["schema_version", "template_version", "project_id", "state_revision", "mode", "interaction_mode", "next_action", "assets", "shots", "dependencies"],
+  "properties": {
+    "schema_version": {"type": "string", "enum": ["2.0"]},
+    "template_version": {"type": "string", "minLength": 1},
+    "project_id": {"type": "string", "minLength": 1},
+    "state_revision": {"type": "integer", "minimum": 0},
+    "mode": {"type": "string", "enum": ["NEW_PRODUCTION", "REVISION"]},
+    "interaction_mode": {"type": "string", "enum": ["DISCOVERY", "PRODUCTION", "PRODUCTION_FAST"]},
+    "next_action": {"type": "string", "minLength": 1},
+    "workflow_status": {"type": "string", "enum": ["ACTIVE", "COMPLETE"]},
+    "brief": {"type": "object"},
+    "storyboard": {"type": "object"},
+    "animatic": {"type": "object"},
+    "generation_plan": {"type": "object"},
+    "final_qc": {"type": "object"},
+    "evidence": {"type": "array", "items": {"type": "object"}},
+    "selections": {"type": "object", "additionalProperties": {"type": "string", "minLength": 1}},
+    "assets": {"type": "array", "items": {"type": "object"}},
+    "shots": {"type": "array", "items": {"type": "object"}},
+    "dependencies": {"type": "array", "items": {"type": "object"}}
+  }
+}

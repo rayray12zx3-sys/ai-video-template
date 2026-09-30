@@ -1,0 +1,77 @@
+{
+  "format": "legacy-project-sanitized-v1",
+  "fixture_id": "legacy-project-source-video",
+  "project": {
+    "legacy_project_id": "legacy-project-source-video",
+    "mode_hint": "NEW_PRODUCTION",
+    "workflow_status_hint": "COMPLETE",
+    "template_version": "2.0",
+    "state_revision": 0,
+    "next_action": "Validate source video routing"
+  },
+  "assets": [
+    {
+      "id": "asset-source-video-ui-rec",
+      "media_type": "VIDEO",
+      "origin": "REAL_UI",
+      "content_role": "UI",
+      "lifecycle": "APPROVED",
+      "selected": true,
+      "sha256": "3456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef012",
+      "provenance": {
+        "created_at": "2025-01-01T00:00:00Z",
+        "author": "sanitized_creator"
+      },
+      "locators": [
+        {
+          "type": "LOCAL",
+          "path": "media/ui-capture.mp4",
+          "availability": "AVAILABLE"
+        }
+      ]
+    }
+  ],
+  "shots": [
+    {
+      "id": "shot-source-video",
+      "duration_frames": 180,
+      "intent": "Real UI navigation recording without AI generation",
+      "input_asset_ids": [
+        "asset-source-video-ui-rec"
+      ],
+      "production_method": "SOURCE_VIDEO",
+      "readiness": "REQUIRED",
+      "new_media_required": false,
+      "editorial_only": true
+    }
+  ],
+  "dependencies": [
+    {
+      "source": "asset:asset-source-video-ui-rec",
+      "target": "shot:shot-source-video",
+      "impact": "SEMANTIC_CONTENT"
+    }
+  ],
+  "selections": {
+    "shot-source-video-ui": "asset-source-video-ui-rec"
+  },
+  "approvals": [
+    {
+      "id": "app-source-video-01",
+      "status": "APPROVED",
+      "actor_type": "HUMAN",
+      "subject": "shot:shot-source-video"
+    }
+  ],
+  "legacy_records": [
+    {
+      "type": "WORKLOG",
+      "note": "The recorded interface capture remains the source video and bypasses AI generation"
+    }
+  ],
+  "unknown_fields": {
+    "legacy_notes": [
+      "SOURCE_VIDEO_ROUTE"
+    ]
+  }
+}

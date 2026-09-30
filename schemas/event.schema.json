@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Canonical event I0 skeleton",
+  "type": "object",
+  "required": ["event_schema_version", "transaction_id", "state_revision_before", "state_revision_after", "project_hash_before", "project_hash_after", "timestamp", "actor", "event_type"],
+  "properties": {
+    "event_schema_version": {"type": "string", "enum": ["1.0"]},
+    "transaction_id": {"type": "string", "minLength": 1},
+    "state_revision_before": {"type": "integer", "minimum": 0},
+    "state_revision_after": {"type": "integer", "minimum": 1},
+    "timestamp": {"type": "string", "minLength": 1},
+    "actor": {"type": "string", "minLength": 1},
+    "event_type": {"type": "string", "minLength": 1},
+    "project_hash_before": {"type": "string", "minLength": 64},
+    "project_hash_after": {"type": "string", "minLength": 64},
+    "transition_metadata": {"type": "object"}
+  }
+}

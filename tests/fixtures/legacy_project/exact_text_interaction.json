@@ -1,0 +1,97 @@
+{
+  "format": "legacy-project-sanitized-v1",
+  "fixture_id": "legacy-project-text-interaction",
+  "project": {
+    "legacy_project_id": "legacy-project-text-interaction",
+    "mode_hint": "NEW_PRODUCTION",
+    "workflow_status_hint": "COMPLETE",
+    "template_version": "2.0",
+    "state_revision": 0,
+    "next_action": "Validate exact-text interaction replay"
+  },
+  "assets": [
+    {
+      "id": "asset-text-interaction-ref-01",
+      "media_type": "IMAGE",
+      "origin": "REFERENCE",
+      "content_role": "KEY_FRAME",
+      "lifecycle": "APPROVED",
+      "selected": true,
+      "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "provenance": {
+        "created_at": "2025-01-01T00:00:00Z",
+        "author": "sanitized_creator"
+      },
+      "locators": [
+        {
+          "type": "LOCAL",
+          "path": "media/reference-image.png",
+          "availability": "AVAILABLE"
+        }
+      ]
+    }
+  ],
+  "shots": [
+    {
+      "id": "shot-text-interaction",
+      "duration_frames": 120,
+      "intent": "A hand contacts an exact-text label on a marked surface.",
+      "input_asset_ids": [
+        "asset-text-interaction-ref-01"
+      ],
+      "production_method": "AUTO",
+      "readiness": "REQUIRED",
+      "new_media_required": true,
+      "editorial_only": false,
+      "requirements": {
+        "identity_sensitivity": "HIGH",
+        "interaction_precision": "HIGH",
+        "semantic_precision": "HIGH",
+        "motion_complexity": "LOW"
+      },
+      "constraints": {
+        "exact_text": "SAMPLE",
+        "interaction": [
+          {
+            "subject": "hand",
+            "action": "CONTACT",
+            "object": "MARKED_PANEL"
+          }
+        ],
+        "text_readable": true,
+        "must_not": [
+          "contact_unmarked_panel"
+        ]
+      }
+    }
+  ],
+  "dependencies": [
+    {
+      "source": "asset:asset-text-interaction-ref-01",
+      "target": "shot:shot-text-interaction",
+      "impact": "SEMANTIC_CONTENT"
+    }
+  ],
+  "selections": {
+    "shot-text-interaction-ref": "asset-text-interaction-ref-01"
+  },
+  "approvals": [
+    {
+      "id": "app-text-interaction-01",
+      "status": "APPROVED",
+      "actor_type": "HUMAN",
+      "subject": "shot:shot-text-interaction"
+    }
+  ],
+  "legacy_records": [
+    {
+      "type": "WORKLOG",
+      "note": "text-interaction requires reference-first composite to guarantee exact text SAMPLE and hand contact relation"
+    }
+  ],
+  "unknown_fields": {
+    "legacy_notes": [
+      "EXACT_TEXT_RETAINED"
+    ]
+  }
+}
