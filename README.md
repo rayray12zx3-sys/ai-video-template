@@ -8,10 +8,10 @@ Provider-neutral AI video production template: design baseline, implementation, 
 **Current phase:** I8 — Controlled Provider Execution ([#4](https://github.com/rayray12zx3-sys/ai-video-template/issues/4))<br>
 **Completed baseline:** I0–I7; I6 4/4 COMPLETE; I7 remains complete<br>
 **Current gate:** Gate B BLOCKED — execution contract unresolved ([#5](https://github.com/rayray12zx3-sys/ai-video-template/issues/5))<br>
-**Active path:** B1-alt no-spend equivalence investigation ([#13](https://github.com/rayray12zx3-sys/ai-video-template/issues/13)) returned BLOCKED; direct managed CLI is not approved for production<br>
-**Current blockers:** nine safety-relevant equivalence UNKNOWN controls; maintained Plugin source/deployment unresolved; B2 spend and receipt evidence remain unresolved<br>
-**Next action:** obtain exact-runtime transport/receipt/parameter evidence or establish the maintained Plugin path; do not start live adapter or paid smoke<br>
-**Verification:** 15 local offline diagnostics/contracts PASS on Python 3.12.14; 11 final read-only probe processes; these do not establish B1 equivalence or GitHub Actions PASS<br>
+**Active path:** exact-runtime no-spend evidence ([#15](https://github.com/rayray12zx3-sys/ai-video-template/issues/15)) returned PARTIAL; direct managed CLI remains unapproved after [#13](https://github.com/rayray12zx3-sys/ai-video-template/issues/13)<br>
+**Current blockers:** strict/provider-effective parameters and trusted task/asset/workspace/charge-refund linkage unresolved; maintained Plugin source/deployment and B2 spend remain blocked<br>
+**Next action:** obtain supported strict/final-parameter and receipt contracts or a safe existing sample from a confirmed intended workspace; no live adapter or paid smoke<br>
+**Verification:** #15: 16 isolated runtime/dependency diagnostics and 5 repository fail-closed tests PASS; 9 final read-only queries; ordinary T2V POST no-retry proven only within the inspected client path; not B1 equivalence or GitHub Actions PASS<br>
 **Last verified:** 2026-10-01
 
 ```text
@@ -26,6 +26,7 @@ Provider-neutral AI video production template: design baseline, implementation, 
 ⏳ I8      Controlled provider execution
    ├─ ⛔ Gate B  Workspace / spend / receipt contracts unresolved
    ├─ ⛔ B1-alt Direct managed CLI equivalence not proven (#13)
+   ├─ ◐ Runtime evidence PARTIAL; critical UNKNOWNs remain (#15)
    ├─ ✅ Output closure  Provider-neutral preparation merged (#6 / PR #9)
    └─ ⏸ Live adapter / paid smoke  Await approved contracts
 ```
