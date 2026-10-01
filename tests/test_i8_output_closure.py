@@ -94,7 +94,9 @@ class OutputClosureTests(unittest.TestCase):
             observed_workspace_id="ws-1", workspace_evidence_ref="mock:status",
         )
         if persist_receipt:
-            self.ledger.record_receipt(receipt, ticket)
+            self.ledger.record_receipt(
+                receipt, ticket, workspace_verifier=lambda r, t: True
+            )
         return ticket, receipt, claim
 
     def create_mock_media(self, filename="candidate-a.mp4", content=b"mock mp4 media bytes"):
