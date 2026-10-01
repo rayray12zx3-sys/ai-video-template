@@ -446,7 +446,6 @@ def adopt_generated_output(
     probed_metadata: dict | None = None,
     *,
     actor: str = "operator",
-    next_action: str | None = None,
     transaction_id: str | None = None,
     workspace_verifier: WorkspaceReceiptVerifier | None = None,
     ffprobe_path: str = "ffprobe",
@@ -478,15 +477,19 @@ def adopt_generated_output(
             not receipt.workspace_evidence_ref.strip()):
         raise ExecutionConflict("missing trusted receipt workspace identity")
 
-    if workspace_verifier is not None:
-        try:
-            if workspace_verifier(receipt, ticket) is not True:
-                raise ExecutionConflict("receipt workspace identity verification failed")
-        except Exception as exc:
-            raise ExecutionConflict("receipt workspace identity verification failed") from exc
+    if receipt.submission_state != "COMPLETED":
+        raise ExecutionConflict("generated output requires a completed receipt")
+
+    persisted_receipt = next(
+        (item for item in ledger.receipts() if item.claim_id == receipt.claim_id),
+        None,
+    )
+    if persisted_receipt is None or persisted_receipt != receipt:
+        raise ExecutionConflict("generated output requires the exact persisted trusted receipt")
 
     claim = next((c for c in ledger.claims() if c.id == receipt.claim_id), None)
-    if (claim is None or claim.ticket_id != ticket.id or
+    if (claim is None or claim.submission_state != "COMPLETED" or
+            claim.ticket_id != ticket.id or
             claim.project_id != intent["project_id"] or
             claim.shot_id != intent["shot_id"] or
             claim.candidate_id != intent["candidate_id"] or
@@ -529,8 +532,23 @@ def adopt_generated_output(
     if not isinstance(probed_metadata, dict) or not probed_metadata.get("exists") or not probed_metadata.get("readable"):
         raise ExecutionConflict("media file is unreadable or malformed")
 
-    if probed_metadata.get("codec") is None and probed_metadata.get("resolution") is None:
-        raise ExecutionConflict("media file contains no video stream")
+    codec = probed_metadata.get("codec")
+    resolution = probed_metadata.get("resolution")
+    duration = probed_metadata.get("duration")
+    if not isinstance(codec, str) or not codec.strip():
+        raise ExecutionConflict("media file is missing a video codec")
+    if not isinstance(resolution, str) or "x" not in resolution.lower():
+        raise ExecutionConflict("media file is missing a valid video resolution")
+    try:
+        width_text, height_text = resolution.lower().split("x", 1)
+        width, height = int(width_text), int(height_text)
+    except (TypeError, ValueError):
+        raise ExecutionConflict("media file is missing a valid video resolution")
+    if width <= 0 or height <= 0:
+        raise ExecutionConflict("media file is missing a valid video resolution")
+    if (not isinstance(duration, (int, float)) or isinstance(duration, bool) or
+            duration <= 0):
+        raise ExecutionConflict("media file is missing a positive duration")
 
     q0_results = check_file_metadata(probed_metadata, origin="GENERATION")
     if q0_results.get("exists") and q0_results["exists"].status == "FAIL":
@@ -572,11 +590,7 @@ def adopt_generated_output(
         },
     }
 
-    target_next_action = (
-        next_action.strip()
-        if isinstance(next_action, str) and next_action.strip()
-        else f"Perform Q1 visual and technical QC on adopted candidate {candidate_id}"
-    )
+    target_next_action = f"Perform Q1 visual and technical QC on adopted candidate {candidate_id}"
 
     after_document = deepcopy(doc)
     after_document["state_revision"] = snapshot.state_revision + 1
