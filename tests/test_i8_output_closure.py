@@ -62,7 +62,8 @@ class OutputClosureTests(unittest.TestCase):
             ticket_id=ticket.id, candidate_id=candidate_id, shot_id="shot-a",
             workspace_id="ws-1", max_cost=2), "state_revision": next_revision}))
 
-    def prepare_submission_and_receipt(self, ticket=None, task_id="task-100"):
+    def prepare_submission_and_receipt(self, ticket=None, task_id="task-100", *,
+                                       completed=True, persist_receipt=True):
         ticket = ticket or self.ticket()
         self.approve_spend(ticket)
         request = self.fixture.request(ticket_id=ticket.id)
@@ -79,16 +80,21 @@ class OutputClosureTests(unittest.TestCase):
             approval_verifier=i3_fixture.I3Tests._mock_approval,
         )
         self.ledger.transition(claim.id, "SUBMITTED", provider_task_id=task_id)
+        if completed:
+            self.ledger.transition(claim.id, "COMPLETED")
         asset_hash = self.fixture.doc["assets"][0]["sha256"]
         upload = (ProviderUpload("input", asset_hash, asset_hash, "upload-1"),)
+        now = datetime.now(timezone.utc).isoformat()
         receipt = ProviderReceipt(
             ticket.id, ticket.payload()["candidate_id"], claim.id, "example", "ws-1", "RAW_CLI",
-            "SUBMITTED", "run-1", task_id, 2, None, (),
-            datetime.now(timezone.utc).isoformat(), None, "provider callback",
+            "COMPLETED" if completed else "SUBMITTED", "run-1", task_id, 2,
+            2 if completed else None, ("output-1",) if completed else (),
+            now, now if completed else None, "provider callback",
             effective_prompt="Source", uploaded_inputs=upload,
             observed_workspace_id="ws-1", workspace_evidence_ref="mock:status",
         )
-        self.ledger.record_receipt(receipt, ticket, workspace_verifier=lambda r, t: True)
+        if persist_receipt:
+            self.ledger.record_receipt(receipt, ticket)
         return ticket, receipt, claim
 
     def create_mock_media(self, filename="candidate-a.mp4", content=b"mock mp4 media bytes"):
@@ -186,7 +192,7 @@ class OutputClosureTests(unittest.TestCase):
         revision_before = self.engine.read().state_revision
         snapshot = adopt_generated_output(
             self.engine, self.ledger, ticket, receipt, file_path, sha256, probed,
-            actor="qc_operator", workspace_verifier=lambda r, t: True,
+            actor="qc_operator",
         )
         self.assertEqual(snapshot.state_revision, revision_before + 1)
         doc = snapshot.document
@@ -208,7 +214,6 @@ class OutputClosureTests(unittest.TestCase):
         with self.assertRaises(ExecutionConflict):
             adopt_generated_output(
                 self.engine, self.ledger, ticket, receipt, missing_file, "0" * 64,
-                workspace_verifier=lambda r, t: True,
             )
 
         file_path, sha256 = self.create_mock_media()
@@ -218,7 +223,6 @@ class OutputClosureTests(unittest.TestCase):
         with self.assertRaises(ExecutionConflict):
             adopt_generated_output(
                 self.engine, self.ledger, ticket, receipt, file_path, sha256, unreadable_meta,
-                workspace_verifier=lambda r, t: True,
             )
 
     def test_no_video_stream_adoption_fails_closed(self):
@@ -232,7 +236,6 @@ class OutputClosureTests(unittest.TestCase):
         with self.assertRaises(ExecutionConflict):
             adopt_generated_output(
                 self.engine, self.ledger, ticket, receipt, file_path, sha256, audio_only,
-                workspace_verifier=lambda r, t: True,
             )
 
     def test_wrong_sha256_adoption_fails_closed(self):
@@ -242,7 +245,6 @@ class OutputClosureTests(unittest.TestCase):
         with self.assertRaises(ExecutionConflict):
             adopt_generated_output(
                 self.engine, self.ledger, ticket, receipt, file_path, wrong_sha256, self.valid_probed_metadata(),
-                workspace_verifier=lambda r, t: True,
             )
 
     def test_stale_state_revision_or_hash_fails_closed(self):
@@ -255,7 +257,6 @@ class OutputClosureTests(unittest.TestCase):
         with self.assertRaises(ExecutionConflict):
             adopt_generated_output(
                 self.engine, self.ledger, ticket, receipt, file_path, sha256, self.valid_probed_metadata(),
-                workspace_verifier=lambda r, t: True,
             )
 
     def test_wrong_ticket_candidate_shot_binding_fails_closed(self):
@@ -266,7 +267,6 @@ class OutputClosureTests(unittest.TestCase):
         with self.assertRaises(ExecutionConflict):
             adopt_generated_output(
                 self.engine, self.ledger, ticket, wrong_receipt, file_path, sha256, self.valid_probed_metadata(),
-                workspace_verifier=lambda r, t: True,
             )
 
     def test_provider_workspace_mismatch_fails_closed(self):
@@ -277,7 +277,6 @@ class OutputClosureTests(unittest.TestCase):
         with self.assertRaises(ExecutionConflict):
             adopt_generated_output(
                 self.engine, self.ledger, ticket, wrong_receipt, file_path, sha256, self.valid_probed_metadata(),
-                workspace_verifier=lambda r, t: True,
             )
 
     def test_missing_trusted_receipt_identity_fails_closed(self):
@@ -288,8 +287,71 @@ class OutputClosureTests(unittest.TestCase):
         with self.assertRaises(ExecutionConflict):
             adopt_generated_output(
                 self.engine, self.ledger, ticket, unverified_receipt, file_path, sha256, self.valid_probed_metadata(),
-                workspace_verifier=lambda r, t: True,
             )
+
+    def test_submitted_receipt_or_claim_cannot_be_adopted(self):
+        ticket, receipt, _ = self.prepare_submission_and_receipt(completed=False)
+        file_path, sha256 = self.create_mock_media()
+        with self.assertRaises(ExecutionConflict):
+            adopt_generated_output(
+                self.engine, self.ledger, ticket, receipt, file_path, sha256,
+                self.valid_probed_metadata(),
+            )
+
+    def test_matching_unpersisted_receipt_is_rejected(self):
+        ticket, receipt, _ = self.prepare_submission_and_receipt(persist_receipt=False)
+        file_path, sha256 = self.create_mock_media()
+        with self.assertRaises(ExecutionConflict):
+            adopt_generated_output(
+                self.engine, self.ledger, ticket, receipt, file_path, sha256,
+                self.valid_probed_metadata(),
+            )
+
+    def test_adoption_next_action_is_deterministic_qc_only(self):
+        ticket, receipt, _ = self.prepare_submission_and_receipt()
+        file_path, sha256 = self.create_mock_media()
+        snapshot = adopt_generated_output(
+            self.engine, self.ledger, ticket, receipt, file_path, sha256,
+            self.valid_probed_metadata(),
+        )
+        self.assertIn("Q1", snapshot.document["next_action"])
+        self.assertNotIn("delivery", snapshot.document["next_action"].lower())
+        self.assertNotIn("final", snapshot.document["next_action"].lower())
+        with self.assertRaises(TypeError):
+            adopt_generated_output(
+                self.engine, self.ledger, ticket, receipt, file_path, sha256,
+                self.valid_probed_metadata(), next_action="FINAL DELIVERY",
+            )
+
+    def test_incomplete_video_metadata_fails_closed(self):
+        for field, value in (
+            ("codec", None),
+            ("resolution", None),
+            ("resolution", "0x720"),
+            ("resolution", "1280x0"),
+            ("duration", None),
+            ("duration", 0),
+        ):
+            with self.subTest(field=field, value=value):
+                fixture = i2_fixture.I2Tests("test_each_gate_passes_with_minimum_evidence")
+                fixture.setUp()
+                self.addCleanup(fixture.tmp.cleanup)
+                engine = fixture.engine
+                ledger = ExecutionLedger(fixture.root)
+
+                original_engine, original_ledger, original_fixture = self.engine, self.ledger, self.fixture
+                self.engine, self.ledger, self.fixture = engine, ledger, fixture
+                try:
+                    ticket, receipt, _ = self.prepare_submission_and_receipt()
+                    file_path, sha256 = self.create_mock_media()
+                    metadata = self.valid_probed_metadata()
+                    metadata[field] = value
+                    with self.assertRaises(ExecutionConflict):
+                        adopt_generated_output(
+                            self.engine, self.ledger, ticket, receipt, file_path, sha256, metadata,
+                        )
+                finally:
+                    self.engine, self.ledger, self.fixture = original_engine, original_ledger, original_fixture
 
     def test_duplicate_adoption_idempotent_safe(self):
         ticket, receipt, _ = self.prepare_submission_and_receipt()
@@ -298,11 +360,9 @@ class OutputClosureTests(unittest.TestCase):
 
         first_snapshot = adopt_generated_output(
             self.engine, self.ledger, ticket, receipt, file_path, sha256, probed,
-            workspace_verifier=lambda r, t: True,
         )
         second_snapshot = adopt_generated_output(
             self.engine, self.ledger, ticket, receipt, file_path, sha256, probed,
-            workspace_verifier=lambda r, t: True,
         )
         self.assertEqual(first_snapshot.state_revision, second_snapshot.state_revision)
         self.assertEqual(first_snapshot.project_hash, second_snapshot.project_hash)
@@ -312,7 +372,6 @@ class OutputClosureTests(unittest.TestCase):
         with self.assertRaises(ExecutionConflict):
             adopt_generated_output(
                 self.engine, self.ledger, ticket, receipt, other_path, other_sha256, probed,
-                workspace_verifier=lambda r, t: True,
             )
 
     def test_q0_failure_remains_non_final(self):
@@ -320,7 +379,6 @@ class OutputClosureTests(unittest.TestCase):
         file_path, sha256 = self.create_mock_media()
         snapshot = adopt_generated_output(
             self.engine, self.ledger, ticket, receipt, file_path, sha256, self.valid_probed_metadata(),
-            workspace_verifier=lambda r, t: True,
         )
         asset = next(a for a in snapshot.document["assets"] if a["id"] == "asset-candidate-a")
         self.assertNotEqual(asset["lifecycle"], "APPROVED")
