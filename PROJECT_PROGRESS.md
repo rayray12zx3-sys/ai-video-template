@@ -24,19 +24,22 @@ GitHub Issues define scope and decisions; merged PRs and inspected runtime/test 
 | Gate B | BLOCKED — execution contract unresolved | [#5](https://github.com/rayray12zx3-sys/ai-video-template/issues/5); workspace, spend and receipt requirements remain independent |
 | B1 maintained Plugin path | BLOCKED | [#12](https://github.com/rayray12zx3-sys/ai-video-template/issues/12); vendor-supported maintained source/extension/deployment path not established |
 | B1-alt managed/private CLI equivalence | BLOCKED — equivalence not proven | [#13](https://github.com/rayray12zx3-sys/ai-video-template/issues/13); 3 CLI-native lookup controls, 8 reproducible repo/local controls, 9 safety-relevant UNKNOWN controls; direct production CLI not approved |
+| Exact-runtime evidence | PARTIAL — critical UNKNOWNs remain | [#15](https://github.com/rayray12zx3-sys/ai-video-template/issues/15); [sanitized report](docs/reports/i8-gate-b-runtime-evidence-2026-10-01.md); 4 scoped exact-runtime facts / 7 UNKNOWN targets; these are different from #13's 20-control equivalence counts |
 | B2 spend | BLOCKED | #5 Decision B retains the provider-enforced-only guard; no approved exact-request cost bound |
 | Receipt/reconciliation evidence | UNKNOWN / unresolved | #5 Decision C; independent workspace/task/asset/charged-refunded linkage remains unproven |
 | Provider-neutral output closure | COMPLETE | [#6](https://github.com/rayray12zx3-sys/ai-video-template/issues/6) closed; [PR #9](https://github.com/rayray12zx3-sys/ai-video-template/pull/9) merged into inspected main `d7f61b86f9434a823b0f5e81f72191ab08828ac3` |
 | Live adapter and paid smoke | NOT STARTED | Await approved Gate B contracts and exact human spend authorization |
 
-Issue #13 validation: Plugin 1.3.2 / managed CLI 1.4.5 / Node 24.19.0 / Python 3.12.14. Fifteen local offline diagnostic/contract tests passed with zero real subprocess/socket attempts. The final allowlisted live probe used 11 read-only processes; account selector binding worked, active workspace stayed unchanged, and runtime/source hashes stayed unchanged. Slots/usage independent workspace evidence and paid transport/retry/receipt semantics remain unproven. This is not a full B1 acceptance PASS or a GitHub Actions result.
+Issue #13 historical validation: Plugin 1.3.2 / managed CLI 1.4.5 / Node 24.19.0 / Python 3.12.14. Fifteen local offline diagnostic/contract tests passed with zero real subprocess/socket attempts. The final allowlisted live probe used 11 read-only processes; account reads succeeded, active workspace stayed unchanged, and runtime/source hashes stayed unchanged. #15's static inspection establishes that explicit-mode account `workspaceId` is caller-derived, so its selector equality does not prove independent receipt workspace binding. This is not a full B1 acceptance PASS or a GitHub Actions result.
+
+Issue #15 validation: the installed ordinary T2V path uses Ky 2.1.0 POST without automatic method retry; Plugin queue resubmission branches remain separate. Local no-wait `params` and account `workspaceId` are echoes, not independent provider-effective parameter/workspace evidence. Sixteen isolated dependency/pure-function diagnostics passed on Node 24.19.0; five existing fail-closed contract tests passed on Python 3.13.14, with zero real subprocess/socket attempts. Nine final installed-wrapper read-only queries used Python 3.12.14; authentication was usable, active workspace/runtime seals stayed unchanged, and no safe linked video sample was established in the bounded inventory. Intended paid workspace, charge/refund linkage and provider-effective params remain unresolved. No live adapter, guard/schema or Plugin/runtime change was made.
 
 In the enumerated #13 probes/tests, no create/upload/generate/dispatch/credit-consuming invocation or workspace switch ran. No production adapter, guard, schema, Plugin or runtime files changed. Documentation synchronization is coordination evidence only.
 
-- Active path: I8 → Gate B → B1-alt result → evidence/source resolution.
+- Active path: I8 → Gate B → #15 PARTIAL runtime evidence → strict-parameter/receipt/source resolution.
 - REQUIRED_NOW: resolve the existing workspace/spend/receipt contract requirements in #4/#5; no new milestone denominator is introduced.
-- DISCOVERY: exact-runtime no-retry and parameter/receipt evidence, or a maintained supported Plugin path, within the existing no-spend boundary.
-- Next action: obtain those specific missing contracts or safe existing samples; preserve the Plugin-managed target while equivalence remains unproven.
+- DISCOVERY: supported strict/final-parameter and trusted receipt contracts, a confirmed-intended-workspace existing safe sample, or a maintained supported Plugin path, within the existing no-spend boundary.
+- Next action: resolve those specific evidence gaps; local/caller echoes do not satisfy provider-origin evidence. Preserve the Plugin-managed target while equivalence remains unproven.
 - Exit condition: #5 accepts a proven execution surface, safe spend contract and trusted receipt requirements before adapter coding or paid smoke.
 - I8 progress percentage: N/A; the parent acceptance checklist has not been re-evaluated into a completion count.
 
@@ -56,6 +59,7 @@ flowchart TD
     P --> I8[⏳ I8 Controlled provider execution]
     I8 --> GB[⛔ Gate B contracts unresolved]
     GB --> ALT[⛔ B1-alt equivalence not proven · #13]
+    GB --> EVID[◐ Runtime evidence PARTIAL · #15]
     I8 --> OUT[✅ Provider-neutral output closure · #6 / PR #9]
     GB --> LIVE[⏸ Adapter / paid smoke await approved contracts]
 ```
@@ -68,6 +72,7 @@ I8     ⏳ Controlled provider execution
 ├─ Gate B  ⛔ BLOCKED: workspace / spend / receipt contracts
 │  ├─ B1 maintained Plugin source/deployment  ⛔ #12
 │  ├─ B1-alt direct managed CLI equivalence  ⛔ #13
+│  ├─ Runtime evidence  ◐ PARTIAL: strict params / trusted receipt · #15
 │  ├─ B2 provider-enforced cost cap  ⛔ #5
 │  └─ Receipt evidence  UNKNOWN / unresolved
 ├─ Provider-neutral output closure  ✅ #6 / PR #9
