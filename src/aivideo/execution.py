@@ -1,5 +1,6 @@
 """Local durable claim/submission protocol. No provider calls are made here."""
 
+from copy import deepcopy
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from contextlib import contextmanager
@@ -10,6 +11,8 @@ import sqlite3
 from typing import Protocol
 
 from .guards import ActionRequest, guard_action
+from .qc import check_file_metadata, probe_media
+from .state_engine import TransactionRequest
 from .tickets import (AccountEntitlementSnapshot, GenerationTicket, ProviderRuntimeSnapshot,
                       SHA256, SURFACES, TechnicalCapabilitySnapshot, UNKNOWN, _digest, ticket_staleness)
 
@@ -431,3 +434,175 @@ class ExecutionLedger:
             raise ExecutionConflict("claim is absent")
         return dict(zip(("state", "request_fingerprint", "local_key", "provider_idempotency_key",
                          "provider_trace_id", "provider_task_id"), row))
+
+
+def adopt_generated_output(
+    engine,
+    ledger: ExecutionLedger,
+    ticket: GenerationTicket,
+    receipt: ProviderReceipt,
+    file_path,
+    sha256: str,
+    probed_metadata: dict | None = None,
+    *,
+    actor: str = "operator",
+    next_action: str | None = None,
+    transaction_id: str | None = None,
+    workspace_verifier: WorkspaceReceiptVerifier | None = None,
+    ffprobe_path: str = "ffprobe",
+    timeout: int = 10,
+):
+    """Adopt a verified generated media file into the canonical project using State Engine."""
+    if ledger.path.parent.resolve() != engine.project_dir.resolve():
+        raise ExecutionConflict("execution ledger must belong to the canonical project")
+
+    if not ticket.verify():
+        raise ExecutionConflict("invalid ticket integrity")
+
+    if ticket_staleness(ticket, engine):
+        raise ExecutionConflict("ticket dependencies are stale")
+
+    intent = ticket.payload()
+
+    if receipt.ticket_id != ticket.id or receipt.candidate_id != intent["candidate_id"]:
+        raise ExecutionConflict("receipt ticket or candidate mismatch")
+
+    if (receipt.provider != intent["provider"] or
+            receipt.workspace_id != intent["workspace_id"] or
+            receipt.execution_surface != intent["execution_surface"] or
+            receipt.runtime_snapshot_id != intent["runtime_snapshot_id"]):
+        raise ExecutionConflict("receipt environment or runtime mismatch")
+
+    if (receipt.observed_workspace_id != intent["workspace_id"] or
+            not isinstance(receipt.workspace_evidence_ref, str) or
+            not receipt.workspace_evidence_ref.strip()):
+        raise ExecutionConflict("missing trusted receipt workspace identity")
+
+    if workspace_verifier is not None:
+        try:
+            if workspace_verifier(receipt, ticket) is not True:
+                raise ExecutionConflict("receipt workspace identity verification failed")
+        except Exception as exc:
+            raise ExecutionConflict("receipt workspace identity verification failed") from exc
+
+    claim = next((c for c in ledger.claims() if c.id == receipt.claim_id), None)
+    if (claim is None or claim.ticket_id != ticket.id or
+            claim.project_id != intent["project_id"] or
+            claim.shot_id != intent["shot_id"] or
+            claim.candidate_id != intent["candidate_id"] or
+            claim.provider != intent["provider"] or
+            claim.workspace_id != intent["workspace_id"] or
+            claim.execution_surface != intent["execution_surface"]):
+        raise ExecutionConflict("receipt claim identity mismatch")
+
+    snapshot = engine.inspect_consistency()
+    if snapshot.access != "WRITABLE_VERSION":
+        raise ExecutionConflict(f"canonical project state is not writable ({snapshot.access})")
+
+    doc = snapshot.document
+    if doc.get("project_id") != intent["project_id"]:
+        raise ExecutionConflict("ticket project ID does not match current canonical state")
+
+    shots = {s["id"]: s for s in doc.get("shots", []) if isinstance(s, dict) and isinstance(s.get("id"), str)}
+    if intent["shot_id"] not in shots:
+        raise ExecutionConflict(f"shot {intent['shot_id']} is absent from canonical state")
+
+    path = Path(file_path)
+    if not path.is_file():
+        raise ExecutionConflict("downloaded local file does not exist")
+
+    try:
+        rel_path = path.resolve().relative_to(engine.project_dir.resolve()).as_posix()
+    except ValueError:
+        try:
+            rel_path = path.relative_to(engine.project_dir).as_posix()
+        except ValueError:
+            raise ExecutionConflict("local media file must be locateable within project directory")
+
+    computed_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
+    if computed_sha256.lower() != sha256.lower():
+        raise ExecutionConflict("local file SHA-256 mismatch")
+
+    if probed_metadata is None:
+        probed_metadata = probe_media(path, timeout=timeout, ffprobe_path=ffprobe_path)
+
+    if not isinstance(probed_metadata, dict) or not probed_metadata.get("exists") or not probed_metadata.get("readable"):
+        raise ExecutionConflict("media file is unreadable or malformed")
+
+    if probed_metadata.get("codec") is None and probed_metadata.get("resolution") is None:
+        raise ExecutionConflict("media file contains no video stream")
+
+    q0_results = check_file_metadata(probed_metadata, origin="GENERATION")
+    if q0_results.get("exists") and q0_results["exists"].status == "FAIL":
+        raise ExecutionConflict("Q0 media exists check failed")
+    if q0_results.get("readable") and q0_results["readable"].status == "FAIL":
+        raise ExecutionConflict("Q0 media readability check failed")
+
+    candidate_id = intent["candidate_id"]
+    shot_id = intent["shot_id"]
+    asset_id = f"asset-{candidate_id}"
+
+    existing_assets = [a for a in doc.get("assets", []) if isinstance(a, dict) and a.get("id") == asset_id]
+    if existing_assets:
+        existing = existing_assets[0]
+        if (existing.get("sha256") == computed_sha256 and
+                existing.get("provider_task_id") == (receipt.provider_task_id or UNKNOWN)):
+            return snapshot
+        raise ExecutionConflict(f"candidate asset {asset_id} already exists with different hash/task")
+
+    new_asset = {
+        "id": asset_id,
+        "origin": "PROVIDER_OUTPUT",
+        "lifecycle": "RECEIVED",
+        "criticality": "OPTIONAL",
+        "sha256": computed_sha256,
+        "provenance": f"Provider {intent['provider']} execution (task {receipt.provider_task_id or UNKNOWN}, ticket {ticket.id}, claim {receipt.claim_id})",
+        "locators": [{"type": "LOCAL", "path": rel_path, "availability": "AVAILABLE"}],
+        "media_metadata": probed_metadata,
+        "provider_task_id": receipt.provider_task_id or UNKNOWN,
+        "lineage": {
+            "ticket_id": ticket.id,
+            "claim_id": receipt.claim_id,
+            "candidate_id": candidate_id,
+            "shot_id": shot_id,
+            "provider": intent["provider"],
+            "workspace_id": intent["workspace_id"],
+            "execution_surface": intent["execution_surface"],
+            "runtime_snapshot_id": intent["runtime_snapshot_id"],
+        },
+    }
+
+    target_next_action = (
+        next_action.strip()
+        if isinstance(next_action, str) and next_action.strip()
+        else f"Perform Q1 visual and technical QC on adopted candidate {candidate_id}"
+    )
+
+    after_document = deepcopy(doc)
+    after_document["state_revision"] = snapshot.state_revision + 1
+    after_document["next_action"] = target_next_action
+    after_document["assets"].append(new_asset)
+
+    tx_id = transaction_id or f"adopt-{candidate_id}-{snapshot.state_revision + 1}"
+    tx_request = TransactionRequest(
+        expected_state_revision=snapshot.state_revision,
+        expected_project_hash=snapshot.project_hash,
+        transaction_id=tx_id,
+        actor=actor,
+        event_type="GENERATED_OUTPUT_ADOPTION",
+    )
+
+    transition_metadata = {
+        "adoption_type": "GENERATED_OUTPUT",
+        "ticket_id": ticket.id,
+        "claim_id": receipt.claim_id,
+        "candidate_id": candidate_id,
+        "shot_id": shot_id,
+        "provider": intent["provider"],
+        "workspace_id": intent["workspace_id"],
+        "sha256": computed_sha256,
+        "local_path": rel_path,
+        "q0_summary": {k: v.status for k, v in q0_results.items()},
+    }
+
+    return engine.begin_transaction(tx_request, after_document, transition_metadata=transition_metadata)

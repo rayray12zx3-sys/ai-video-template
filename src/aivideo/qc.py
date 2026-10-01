@@ -8,7 +8,9 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 import hashlib
 import json
+from pathlib import Path
 import re
+import subprocess
 
 from .validators import fingerprint
 
@@ -542,3 +544,137 @@ def record_human_override(report, *, actor, decision, reason, timestamp, dimensi
     if dimension is not None and dimension not in dict(report.dimensions):
         raise ValueError("override dimension is not in report")
     return HumanOverride(actor, decision, reason, report.id, dimension, timestamp, report.binding)
+
+
+def _parse_fps(raw):
+    if raw is None:
+        return None
+    if isinstance(raw, (int, float)):
+        return float(raw)
+    if isinstance(raw, str) and "/" in raw:
+        num, den = raw.split("/", 1)
+        try:
+            n, d = float(num), float(den)
+            if d > 0:
+                val = round(n / d, 4)
+                return int(val) if val.is_integer() else val
+        except ValueError:
+            return None
+    try:
+        val = float(raw)
+        return int(val) if val.is_integer() else val
+    except (ValueError, TypeError):
+        return None
+
+
+def _parse_int(raw):
+    if raw is None:
+        return None
+    try:
+        val = int(raw)
+        return val if val >= 0 else None
+    except (ValueError, TypeError):
+        return None
+
+
+def probe_media(file_path, *, timeout=10, ffprobe_path="ffprobe"):
+    """Invoke local ffprobe with explicit argv and no shell to extract normalized Q0 metadata."""
+    default_failed = {
+        "exists": False, "readable": False, "container": None, "codec": None,
+        "resolution": None, "fps": None, "frame_count": None, "duration": None,
+        "audio_presence": False, "color_metadata": None,
+    }
+    path = Path(file_path)
+    if not path.is_file():
+        return default_failed
+
+    argv = [
+        ffprobe_path,
+        "-v", "quiet",
+        "-print_format", "json",
+        "-show_format",
+        "-show_streams",
+        str(path),
+    ]
+    try:
+        res = subprocess.run(argv, capture_output=True, text=True, check=False,
+                             timeout=timeout, shell=False)
+    except (subprocess.SubprocessError, OSError, ValueError, UnicodeError):
+        return {**default_failed, "exists": True}
+
+    if res.returncode != 0 or not res.stdout or not res.stdout.strip():
+        return {**default_failed, "exists": True}
+
+    try:
+        data = json.loads(res.stdout)
+    except (json.JSONDecodeError, UnicodeError, ValueError):
+        return {**default_failed, "exists": True}
+
+    if not isinstance(data, dict):
+        return {**default_failed, "exists": True}
+
+    fmt = data.get("format") if isinstance(data.get("format"), dict) else {}
+    format_name = fmt.get("format_name")
+    container = format_name.split(",")[0] if isinstance(format_name, str) and format_name.strip() else None
+
+    duration = None
+    if fmt.get("duration") is not None:
+        try:
+            d_val = float(fmt["duration"])
+            if d_val >= 0:
+                duration = int(d_val) if d_val.is_integer() else round(d_val, 4)
+        except (ValueError, TypeError):
+            pass
+
+    streams = data.get("streams") if isinstance(data.get("streams"), list) else []
+    video_stream = next((s for s in streams if isinstance(s, dict) and s.get("codec_type") == "video"), None)
+    audio_presence = any(isinstance(s, dict) and s.get("codec_type") == "audio" for s in streams)
+
+    codec = None
+    resolution = None
+    fps = None
+    frame_count = None
+    color_metadata = None
+
+    if video_stream:
+        codec_name = video_stream.get("codec_name")
+        if isinstance(codec_name, str) and codec_name.strip():
+            codec = codec_name.strip()
+
+        w, h = _parse_int(video_stream.get("width")), _parse_int(video_stream.get("height"))
+        if w is not None and h is not None and w > 0 and h > 0:
+            resolution = f"{w}x{h}"
+
+        fps = _parse_fps(video_stream.get("r_frame_rate")) or _parse_fps(video_stream.get("avg_frame_rate"))
+        frame_count = _parse_int(video_stream.get("nb_frames"))
+
+        if duration is None and video_stream.get("duration") is not None:
+            try:
+                d_val = float(video_stream["duration"])
+                if d_val >= 0:
+                    duration = int(d_val) if d_val.is_integer() else round(d_val, 4)
+            except (ValueError, TypeError):
+                pass
+
+        color_space = video_stream.get("color_space")
+        if isinstance(color_space, str) and color_space.strip() and color_space.lower() != "unknown":
+            color_metadata = color_space.strip()
+
+    return {
+        "exists": True,
+        "readable": True,
+        "container": container,
+        "codec": codec,
+        "resolution": resolution,
+        "fps": fps,
+        "frame_count": frame_count,
+        "duration": duration,
+        "audio_presence": audio_presence,
+        "color_metadata": color_metadata,
+    }
+
+
+def probe_q0(file_path, expected=None, *, origin="GENERATION", timeout=10, ffprobe_path="ffprobe", evidence_refs=()):
+    """Probe media and evaluate Q0 findings against expected criteria."""
+    metadata = probe_media(file_path, timeout=timeout, ffprobe_path=ffprobe_path)
+    return metadata, check_file_metadata(metadata, expected, origin=origin, evidence_refs=evidence_refs)
