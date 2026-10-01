@@ -2,17 +2,43 @@
 
 Derived coordination view. Canonical project truth and execution semantics remain unchanged.
 
-Last verified: 2026-09-30
+Last verified: 2026-10-01
 
 ## Current milestone / phase
 
-- Phase: **I7 — Hardening and release readiness — COMPLETE**
+- Phase: **I8 — Controlled Provider Execution — IN PROGRESS** ([#4](https://github.com/rayray12zx3-sys/ai-video-template/issues/4))
+- Completed baseline: **I0–I7**; I7 Public Readiness remains complete.
 - I6 phase-task progress: **4 / 4 (100%) — COMPLETE**
 - Verification progress: **I6a–I6d complete; local CI-equivalent verification is documented**
-- Current item: **Post-I7 public canonical operation**
+- Current item: **Gate B — execution-contract resolution** ([#5](https://github.com/rayray12zx3-sys/ai-video-template/issues/5))
 - Current validation mode: GitHub Actions for hosted checks; record local CI-equivalent verification separately
 - Downstream dependency blocks: none for I7 closeout
 - I6 exit: satisfied; legacy migration and replay phase complete
+
+## I8 current gate and evidence
+
+GitHub Issues define scope and decisions; merged PRs and inspected runtime/test evidence define implementation and verification. This view does not approve an execution surface or spend.
+
+| Item | Current state | Evidence / blocker |
+| --- | --- | --- |
+| Gate B | BLOCKED — execution contract unresolved | [#5](https://github.com/rayray12zx3-sys/ai-video-template/issues/5); workspace, spend and receipt requirements remain independent |
+| B1 maintained Plugin path | BLOCKED | [#12](https://github.com/rayray12zx3-sys/ai-video-template/issues/12); vendor-supported maintained source/extension/deployment path not established |
+| B1-alt managed/private CLI equivalence | BLOCKED — equivalence not proven | [#13](https://github.com/rayray12zx3-sys/ai-video-template/issues/13); 3 CLI-native lookup controls, 8 reproducible repo/local controls, 9 safety-relevant UNKNOWN controls; direct production CLI not approved |
+| B2 spend | BLOCKED | #5 Decision B retains the provider-enforced-only guard; no approved exact-request cost bound |
+| Receipt/reconciliation evidence | UNKNOWN / unresolved | #5 Decision C; independent workspace/task/asset/charged-refunded linkage remains unproven |
+| Provider-neutral output closure | COMPLETE | [#6](https://github.com/rayray12zx3-sys/ai-video-template/issues/6) closed; [PR #9](https://github.com/rayray12zx3-sys/ai-video-template/pull/9) merged into inspected main `d7f61b86f9434a823b0f5e81f72191ab08828ac3` |
+| Live adapter and paid smoke | NOT STARTED | Await approved Gate B contracts and exact human spend authorization |
+
+Issue #13 validation: Plugin 1.3.2 / managed CLI 1.4.5 / Node 24.19.0 / Python 3.12.14. Fifteen local offline diagnostic/contract tests passed with zero real subprocess/socket attempts. The final allowlisted live probe used 11 read-only processes; account selector binding worked, active workspace stayed unchanged, and runtime/source hashes stayed unchanged. Slots/usage independent workspace evidence and paid transport/retry/receipt semantics remain unproven. This is not a full B1 acceptance PASS or a GitHub Actions result.
+
+In the enumerated #13 probes/tests, no create/upload/generate/dispatch/credit-consuming invocation or workspace switch ran. No production adapter, guard, schema, Plugin or runtime files changed. Documentation synchronization is coordination evidence only.
+
+- Active path: I8 → Gate B → B1-alt result → evidence/source resolution.
+- REQUIRED_NOW: resolve the existing workspace/spend/receipt contract requirements in #4/#5; no new milestone denominator is introduced.
+- DISCOVERY: exact-runtime no-retry and parameter/receipt evidence, or a maintained supported Plugin path, within the existing no-spend boundary.
+- Next action: obtain those specific missing contracts or safe existing samples; preserve the Plugin-managed target while equivalence remains unproven.
+- Exit condition: #5 accepts a proven execution surface, safe spend contract and trusted receipt requirements before adapter coding or paid smoke.
+- I8 progress percentage: N/A; the parent acceptance checklist has not been re-evaluated into a completion count.
 
 ## Compressed progress tree
 
@@ -27,18 +53,25 @@ flowchart TD
     C --> D[✅ I6d Replay verification]
     P --> I7[✅ I7 Hardening / release readiness]
     I7 --> PUB[✅ Public Readiness complete]
+    P --> I8[⏳ I8 Controlled provider execution]
+    I8 --> GB[⛔ Gate B contracts unresolved]
+    GB --> ALT[⛔ B1-alt equivalence not proven · #13]
+    I8 --> OUT[✅ Provider-neutral output closure · #6 / PR #9]
+    GB --> LIVE[⏸ Adapter / paid smoke await approved contracts]
 ```
 
 ## Active path
 
 ```text
-I6  ✅ COMPLETE
-├─ I6a mapping contract  ✅
-├─ I6b importer + dry-run  ✅
-├─ I6c safe canonical adoption  ✅
-└─ I6d replay verification  ✅
-   └─ I7 hardening / release readiness
-      └─ Public Readiness  ✅ COMPLETE
+I0–I7  ✅ COMPLETE
+I8     ⏳ Controlled provider execution
+├─ Gate B  ⛔ BLOCKED: workspace / spend / receipt contracts
+│  ├─ B1 maintained Plugin source/deployment  ⛔ #12
+│  ├─ B1-alt direct managed CLI equivalence  ⛔ #13
+│  ├─ B2 provider-enforced cost cap  ⛔ #5
+│  └─ Receipt evidence  UNKNOWN / unresolved
+├─ Provider-neutral output closure  ✅ #6 / PR #9
+└─ Live adapter / paid smoke  ⏸ Await approved contracts
 ```
 
 ## Evidence mapping
