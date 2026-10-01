@@ -108,7 +108,7 @@ Before I7 closes:
 
 - Legacy behavior is generalized and covered by deterministic fixtures and regression tests.
 - Windows Python 3.13.14 compileall and unit tests passed (117 tests, 1 skipped); this does not replace the required Python 3.11/3.14 verification.
-- Public-tree inventory: 93 PUBLIC, 0 SANITIZE, 0 PRIVATE-REMOVE. History, GitHub metadata, licensing, and final release checks remain separate from this current-tree classification.
+- I7 release-candidate inventory at closeout: 93 PUBLIC, 0 SANITIZE, 0 PRIVATE-REMOVE. This is historical I7 evidence, not the current I8 tracked-file count. History, GitHub metadata, licensing, and final release checks remain separate from that release-candidate classification.
 - Public CI remains provider-offline and does not authenticate or perform paid generation.
 - Publication provenance is fail-closed: the sanitized tree may be exported, but inherited private Git history and hosting metadata are not publication inputs.
 
@@ -121,7 +121,7 @@ Closeout evidence:
 
 - clean public canonical repository with fresh Git history
 - initial public root commit uses GitHub noreply identity
-- 93 tracked files, all classified PUBLIC
+- 93 tracked files at the I7 closeout commit, all classified PUBLIC; later I8 development adds files and does not retroactively change this historical closeout count
 - Apache License 2.0
 - Windows Python 3.11 public CI PASS
 - Windows Python 3.14 public CI PASS
