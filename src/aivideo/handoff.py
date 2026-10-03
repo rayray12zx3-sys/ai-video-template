@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from .state_engine import RemoteStateConflict, StateEngine
+from .schema import SchemaError
 
 
 def _git(repo: Path, *args):
@@ -16,6 +17,83 @@ def _git(repo: Path, *args):
 def _git_bytes(repo: Path, *args):
     return subprocess.run(["git", *args], cwd=repo, capture_output=True,
                           check=True, timeout=5).stdout
+
+
+def _bootstrap_identity(repo: Path, project_dir: Path):
+    repo = Path(repo).resolve()
+    project_dir = Path(project_dir).resolve()
+    relative = project_dir.relative_to(repo)
+    if Path(_git(repo, "rev-parse", "--show-toplevel")).resolve() != repo:
+        raise RemoteStateConflict("bootstrap repository must be the Git worktree root")
+    branch = _git(repo, "branch", "--show-current")
+    if not branch:
+        raise RemoteStateConflict("bootstrap requires an attached branch")
+    commit = _git(repo, "rev-parse", "HEAD")
+    if _git(repo, "rev-parse", f"refs/remotes/origin/{branch}") != commit:
+        raise RemoteStateConflict("fetched origin branch differs from bootstrap HEAD")
+    names = [(relative / name).as_posix() for name in ("project.yaml", "events.jsonl")]
+    if _git_bytes(repo, "--literal-pathspecs", "ls-tree", "-z", commit, "--", *names):
+        raise RemoteStateConflict("bootstrap committed base already contains canonical files")
+    # Bind evidence to the project location as well as the repository identity.
+    return {
+        "bootstrap_version": "1.0",
+        "remote_identity_sha256": hashlib.sha256(_git(repo, "remote", "get-url", "origin").encode("utf-8")).hexdigest(),
+        "branch": branch, "base_commit": commit,
+        "project_path": relative.as_posix(),
+    }
+
+
+def _check_bootstrap_worktree(project_dir: Path, snapshot=None):
+    project_dir = Path(project_dir)
+    project = project_dir / "project.yaml"
+    events = project_dir / "events.jsonl"
+    journal = project_dir / ".pending-transaction.json"
+    if journal.exists() or journal.is_symlink():
+        raise RemoteStateConflict("pending transaction prevents bootstrap handoff")
+    if project.is_symlink() or events.is_symlink():
+        raise RemoteStateConflict("bootstrap canonical files must not be symlinks")
+    if events.exists() and events.read_bytes() != b"":
+        raise RemoteStateConflict("bootstrap working history must be empty")
+    if snapshot is None:
+        if project.exists():
+            raise RemoteStateConflict("bootstrap working project already exists")
+    else:
+        actual = StateEngine(project_dir).inspect_consistency()
+        if (actual.access != "WRITABLE_VERSION" or actual.state_revision != 0 or
+                actual != snapshot):
+            raise RemoteStateConflict("bootstrap retry differs from the genesis snapshot")
+
+
+def capture_bootstrap_base(repo: Path, project_dir: Path):
+    """Capture an uninitialized Git base after the operator fetches origin.
+
+    Performs only local Git reads. Empty prepared history is permitted; an
+    existing project is not. Retain this evidence for an exact bootstrap retry.
+    """
+    try:
+        base = _bootstrap_identity(repo, project_dir)
+        _check_bootstrap_worktree(project_dir)
+        return base
+    except (ValueError, subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as exc:
+        raise RemoteStateConflict("cannot capture bootstrap base and fetched origin ref") from exc
+
+
+def verify_bootstrap_base(repo: Path, project_dir: Path, base: dict, snapshot=None):
+    """Verify fetched refs and absent committed canonical files before bootstrap.
+
+    A snapshot permits only an exact revision-zero retry in the working tree.
+    Like ordinary handoff, this cannot detect a remote advance until fetch and
+    does not provide a distributed lock. No network request is performed.
+    """
+    try:
+        actual = _bootstrap_identity(repo, project_dir)
+        for field, value in actual.items():
+            if value != base[field]:
+                raise RemoteStateConflict(f"bootstrap base differs: {field}")
+        _check_bootstrap_worktree(project_dir, snapshot)
+    except (KeyError, TypeError, ValueError, SchemaError, subprocess.CalledProcessError,
+            subprocess.TimeoutExpired, OSError) as exc:
+        raise RemoteStateConflict("cannot verify bootstrap base and fetched origin ref") from exc
 
 
 def capture_handoff_base(repo: Path, project_dir: Path):

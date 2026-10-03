@@ -306,6 +306,48 @@ class StateEngine:
         self.journal = PendingJournal(self.project_dir)
         self.repo = Path(repo) if repo is not None else None
 
+    def bootstrap(self, initial_document: dict, *, handoff_base: dict | None = None) -> ProjectSnapshot:
+        """Create revision-zero genesis with empty history, or retry exact bytes.
+
+        No ordinary transition, pre-state hash, or genesis event exists here.
+        Git-backed calls require evidence from capture_bootstrap_base().
+        """
+        with self.lock.acquire("BOOTSTRAP"):
+            document = deepcopy(initial_document)
+            validate(document, "project")
+            if document["state_revision"] != 0:
+                raise StateConflict("bootstrap requires initial revision zero")
+            raw = _json_bytes(document)
+            if self.journal.path.exists() or self.journal.path.is_symlink():
+                raise RecoveryConflict("pending transaction prevents bootstrap")
+            snapshot = None
+            try:
+                if self.project_path.is_symlink() or self.events_path.is_symlink():
+                    raise StateConflict("bootstrap canonical files must not be symlinks")
+                history_exists = self.events_path.exists()
+                if history_exists and self.events_path.read_bytes() != b"":
+                    raise StateConflict("bootstrap requires zero-byte event history")
+                if self.project_path.exists():
+                    if not history_exists or self.project_path.read_bytes() != raw:
+                        raise StateConflict("bootstrap cannot overwrite an initialized project")
+                    snapshot = self.inspect_consistency()
+            except (OSError, SchemaError) as exc:
+                raise StateConflict("cannot verify bootstrap canonical files") from exc
+            from .handoff import verify_bootstrap_base
+            if self.repo is not None:
+                if handoff_base is None:
+                    raise RemoteStateConflict("Git-backed bootstrap requires explicit bootstrap evidence")
+                verify_bootstrap_base(self.repo, self.project_dir, handoff_base, snapshot)
+            elif handoff_base is not None:
+                raise RemoteStateConflict("bootstrap evidence requires a Git repository")
+            if snapshot is not None:
+                return snapshot
+            # Empty history + absent project remains retryable after process exit.
+            if not history_exists:
+                _atomic_replace(self.events_path, b"")
+            _atomic_replace(self.project_path, raw)
+            return self.inspect_consistency()
+
     def read(self) -> ProjectSnapshot:
         raw = self.project_path.read_bytes()
         try:

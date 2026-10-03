@@ -26,6 +26,26 @@ If origin canonical state advanced unexpectedly:
 
 Do not force-overwrite.
 
+## Empty-project bootstrap
+
+Before a project has a canonical revision/hash, use `capture_bootstrap_base`
+and `StateEngine.bootstrap(..., handoff_base=base)` rather than ordinary
+handoff evidence. Fetch `origin` first. Bootstrap requires a committed base
+with neither `project.yaml` nor `events.jsonl`, local HEAD equal to fetched
+`origin/<branch>`, and evidence binding the remote identity fingerprint,
+attached branch, commit and repository-relative project path. Working canonical
+files must be absent, except for a zero-byte prepared history or an exact
+revision-zero retry using the retained bootstrap evidence. A pending journal,
+competing candidate or different fetched origin ref fails closed.
+
+Revision zero is genesis with empty history; no `-1 -> 0` event exists. Bootstrap
+is local and offline. As with ordinary handoff, a tracking ref proves only the
+last fetched base, not live remote freshness or exclusive remote ownership.
+Commit/push genesis, fetch, then capture ordinary handoff evidence before the
+first Git-backed `0 -> 1` transaction. See the
+[I1 protocol](../implementation/phase-i1-state-engine.md#revision-zero-bootstrap)
+for crash retry and exact-byte idempotence.
+
 ## Environment profile
 
 Machine-specific capabilities remain outside canonical project semantics:
