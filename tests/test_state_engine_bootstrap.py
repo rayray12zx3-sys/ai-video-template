@@ -266,6 +266,10 @@ class GitBootstrapTests(unittest.TestCase):
         verify_bootstrap_base(self.repo, self.project, self.base)
         self.assertNotIn("remote_url", self.base)
         self.assertEqual(len(self.base["remote_identity_sha256"]), 64)
+        self.assertEqual(set(self.base["canonical_attributes"]),
+                         {"project/project.yaml", "project/events.jsonl"})
+        for attributes in self.base["canonical_attributes"].values():
+            self.assertEqual(attributes["text"], "unset")
         result = self.engine.bootstrap(self.document, handoff_base=self.base)
         with patch("aivideo.state_engine._atomic_replace", side_effect=AssertionError("retry wrote")):
             self.assertEqual(self.engine.bootstrap(self.document, handoff_base=self.base), result)
@@ -284,6 +288,76 @@ class GitBootstrapTests(unittest.TestCase):
         event, = self.engine.inspect_history()
         self.assertEqual((event["state_revision_before"], event["state_revision_after"]), (0, 1))
         self.assertEqual(event["project_hash_before"], result.project_hash)
+
+    def assert_attributes_rejected_before_canonical_writes(self):
+        with self.assertRaises(RemoteStateConflict):
+            capture_bootstrap_base(self.repo, self.project)
+        with self.assertRaises(RemoteStateConflict):
+            verify_bootstrap_base(self.repo, self.project, self.base)
+        with patch("aivideo.state_engine._atomic_replace", side_effect=AssertionError("unsafe bootstrap wrote")):
+            self.assert_rejected()
+        self.assertFalse(self.engine.project_path.exists())
+        self.assertFalse(self.engine.events_path.exists())
+
+    def test_autocrlf_without_nontext_attributes_fails_before_bootstrap(self):
+        # An empty working attribute file overrides the previously committed one.
+        (self.repo / ".gitattributes").write_bytes(b"")
+        self.assertEqual(self.git("config", "core.autocrlf"), "true")
+        self.assert_attributes_rejected_before_canonical_writes()
+
+    def test_each_canonical_path_requires_effective_nontext_attribute(self):
+        for raw in (b"project.yaml -text\n", b"events.jsonl -text\n",
+                    b"project.yaml text\nevents.jsonl -text\n",
+                    b"project.yaml -text\nevents.jsonl text=auto\n",
+                    b"project.yaml eol=lf\nevents.jsonl -text\n"):
+            with self.subTest(attributes=raw):
+                (self.repo / ".gitattributes").write_bytes(raw)
+                self.assert_attributes_rejected_before_canonical_writes()
+
+    def test_effective_nested_and_info_attributes_override_root_policy(self):
+        self.project.mkdir()
+        nested = self.project / ".gitattributes"
+        nested.write_bytes(b"events.jsonl text=auto\n")
+        self.assert_attributes_rejected_before_canonical_writes()
+        nested.unlink()
+        info = self.repo / ".git" / "info" / "attributes"
+        info.write_bytes(b"project/project.yaml text\n")
+        self.assert_attributes_rejected_before_canonical_writes()
+
+    def test_nontext_paths_with_other_byte_conversions_are_rejected(self):
+        for name in ("project.yaml", "events.jsonl"):
+            for attribute in ("filter=bootstrap-test", "ident", "working-tree-encoding=UTF-16"):
+                with self.subTest(name=name, attribute=attribute):
+                    raw = f"project.yaml -text\nevents.jsonl -text\n{name} {attribute}\n"
+                    (self.repo / ".gitattributes").write_bytes(raw.encode("utf-8"))
+                    self.assert_attributes_rejected_before_canonical_writes()
+
+    def test_safe_attribute_change_still_invalidates_captured_evidence(self):
+        # -filter is also safe, but this is a different effective attribute set.
+        (self.repo / ".gitattributes").write_bytes(
+            b"project.yaml -text -filter\nevents.jsonl -text\n")
+        changed = capture_bootstrap_base(self.repo, self.project)
+        self.assertNotEqual(changed["canonical_attributes"], self.base["canonical_attributes"])
+        with self.assertRaises(RemoteStateConflict):
+            verify_bootstrap_base(self.repo, self.project, self.base)
+        with patch("aivideo.state_engine._atomic_replace", side_effect=AssertionError("stale evidence wrote")):
+            self.assert_rejected()
+        self.assertEqual(self.engine.bootstrap(self.document, handoff_base=changed).state_revision, 0)
+
+    def test_attribute_change_blocks_exact_retry_without_canonical_mutation(self):
+        genesis = self.engine.bootstrap(self.document, handoff_base=self.base)
+        before = (self.engine.project_path.read_bytes(), self.engine.events_path.read_bytes())
+        (self.repo / ".gitattributes").write_bytes(b"* text=auto\n")
+        with self.assertRaises(RemoteStateConflict):
+            verify_bootstrap_base(self.repo, self.project, self.base, genesis)
+        self.assert_rejected()
+        self.assertEqual(before, (self.engine.project_path.read_bytes(), self.engine.events_path.read_bytes()))
+
+    def test_old_evidence_without_attribute_binding_fails_closed(self):
+        old = {key: value for key, value in self.base.items() if key != "canonical_attributes"}
+        with self.assertRaises(RemoteStateConflict):
+            verify_bootstrap_base(self.repo, self.project, old)
+        self.assert_rejected(old)
 
     def test_missing_malformed_or_wrong_kind_evidence_conflicts(self):
         for evidence in ({}, None, [], {"handoff_version": "1.0"},

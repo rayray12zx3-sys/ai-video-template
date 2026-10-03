@@ -19,6 +19,29 @@ def _git_bytes(repo: Path, *args):
                           check=True, timeout=5).stdout
 
 
+def _bootstrap_attributes(repo: Path, names: list[str]):
+    """Prove byte-preserving canonical paths without invoking any Git filters."""
+    attributes = ("text", "eol", "crlf", "filter", "ident", "working-tree-encoding")
+    raw = _git_bytes(repo, "check-attr", "-z", *attributes, "--", *names)
+    parts = raw.decode("utf-8").split("\0")
+    if parts.pop() != "" or len(parts) != len(names) * len(attributes) * 3:
+        raise RemoteStateConflict("cannot inspect effective canonical Git attributes")
+    result = {name: {} for name in names}
+    for name, attribute, value in zip(parts[::3], parts[1::3], parts[2::3]):
+        if name not in result or attribute not in attributes or attribute in result[name]:
+            raise RemoteStateConflict("unexpected canonical Git attribute result")
+        result[name][attribute] = value
+    for name, values in result.items():
+        # Explicit -text disables autocrlf, eol and the legacy crlf attribute.
+        # Other conversions operate even on non-text paths and must be disabled.
+        if values["text"] != "unset":
+            raise RemoteStateConflict(f"bootstrap requires effective -text for {name}")
+        for attribute in ("filter", "ident", "working-tree-encoding"):
+            if values[attribute] not in ("unset", "unspecified"):
+                raise RemoteStateConflict(f"bootstrap forbids Git {attribute} conversion for {name}")
+    return result
+
+
 def _bootstrap_identity(repo: Path, project_dir: Path):
     repo = Path(repo).resolve()
     project_dir = Path(project_dir).resolve()
@@ -36,10 +59,11 @@ def _bootstrap_identity(repo: Path, project_dir: Path):
         raise RemoteStateConflict("bootstrap committed base already contains canonical files")
     # Bind evidence to the project location as well as the repository identity.
     return {
-        "bootstrap_version": "1.0",
+        "bootstrap_version": "1.1",
         "remote_identity_sha256": hashlib.sha256(_git(repo, "remote", "get-url", "origin").encode("utf-8")).hexdigest(),
         "branch": branch, "base_commit": commit,
         "project_path": relative.as_posix(),
+        "canonical_attributes": _bootstrap_attributes(repo, names),
     }
 
 
@@ -69,6 +93,7 @@ def capture_bootstrap_base(repo: Path, project_dir: Path):
 
     Performs only local Git reads. Empty prepared history is permitted; an
     existing project is not. Retain this evidence for an exact bootstrap retry.
+    Both canonical paths require effective -text and no other byte conversions.
     """
     try:
         base = _bootstrap_identity(repo, project_dir)
@@ -82,6 +107,7 @@ def verify_bootstrap_base(repo: Path, project_dir: Path, base: dict, snapshot=No
     """Verify fetched refs and absent committed canonical files before bootstrap.
 
     A snapshot permits only an exact revision-zero retry in the working tree.
+    Effective canonical attributes must remain byte-preserving and match capture.
     Like ordinary handoff, this cannot detect a remote advance until fetch and
     does not provide a distributed lock. No network request is performed.
     """

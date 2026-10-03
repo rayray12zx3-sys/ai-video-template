@@ -38,6 +38,14 @@ files must be absent, except for a zero-byte prepared history or an exact
 revision-zero retry using the retained bootstrap evidence. A pending journal,
 competing candidate or different fetched origin ref fails closed.
 
+Capture and verification also require effective `-text` on both canonical
+paths and no active `filter`, `ident` or `working-tree-encoding` conversions.
+They query Git attributes before canonical creation and bind the effective
+values into bootstrap evidence. Missing `-text` (including with
+`core.autocrlf=true`) or changed attributes after capture rejects bootstrap.
+Commit the byte-preserving policy in the base's `.gitattributes` so subsequent
+workstations inherit it. Ordinary handoff checks are unchanged.
+
 Revision zero is genesis with empty history; no `-1 -> 0` event exists. Bootstrap
 is local and offline. As with ordinary handoff, a tracking ref proves only the
 last fetched base, not live remote freshness or exclusive remote ownership.

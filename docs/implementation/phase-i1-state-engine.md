@@ -129,14 +129,28 @@ does not make an occupied committed base eligible for bootstrap.
 Retain the original bootstrap evidence for retries; do not capture new empty-base
 evidence after genesis exists. Commit/push genesis and fetch before capturing
 ordinary `capture_handoff_base` evidence for the first Git-backed transaction.
-This preserves the existing ordinary committed-base anchor. Bootstrap handoff
-also retains ordinary exact-byte requirements: commit `project.yaml -text` and
-`events.jsonl -text` patterns in the repository's `.gitattributes` before
-bootstrap to preserve canonical bytes when Git's `core.autocrlf` is enabled.
-Git text conversion can otherwise make the post-checkpoint ordinary handoff
-fail closed; bootstrap does not configure Git or normalize canonical bytes.
-The Git regression fixture enables `core.autocrlf=true` and commits this policy
-before testing genesis and the first ordinary transaction. Bootstrap handoff
+This preserves the existing ordinary committed-base anchor. Before accepting
+bootstrap evidence, both capture and verification query `git check-attr -z`
+for `text`, `eol`, `crlf`, `filter`, `ident` and `working-tree-encoding` on the
+two repository-relative canonical paths. This checks effective attributes,
+including nested attribute files and Git's local/global attribute overrides.
+Each path must have `text=unset` (explicit `-text`), which disables Git text/
+line-ending conversion regardless of `core.autocrlf`, `eol` or legacy `crlf`.
+The independent `filter`, `ident` and `working-tree-encoding` conversions must
+be unset or unspecified. Bootstrap rejects any other policy before creating
+canonical files; no clean/smudge filter command is invoked to perform this check.
+
+Bootstrap evidence version `1.1` binds the complete effective values under
+`canonical_attributes`. Verification re-queries them and rejects any changed
+values, including a change to another safe policy. Evidence missing this binding
+is rejected. Exact retries also recheck attributes before returning genesis.
+Commit `project.yaml -text` and `events.jsonl -text` patterns in the base's
+`.gitattributes`; bootstrap does not configure Git or normalize canonical bytes.
+Ordinary handoff behavior remains unchanged. Regression coverage tests missing
+`-text` with `core.autocrlf=true`, both paths independently, nested/local overrides,
+other byte conversions, changed attributes and exact retry. The successful Git
+fixture uses `core.autocrlf=true` with `-text` and tests the first ordinary
+transaction after checkpointing genesis. Bootstrap handoff
 uses local Git reads only: an **unfetched** remote advance cannot be detected,
 and capture is not a reservation or remote lock. The single-active-workstation
 and operator-fetch rules still apply.

@@ -135,9 +135,13 @@ project.yaml -text
 events.jsonl -text
 ```
 
-Automatic LF/CRLF conversion changes canonical hashes and can make an ordinary
-handoff conflict after checkpointing. The State Engine does not change Git
-configuration or weaken exact-byte verification. Fetch `origin` before:
+Bootstrap capture and verification enforce the effective attributes of both
+canonical paths before canonical writes: `text` must be unset (explicit
+`-text`), and `filter`, `ident` and `working-tree-encoding` must be unset or
+unspecified. Missing `-text` is rejected, including with `core.autocrlf=true`.
+Bootstrap evidence binds the effective attributes; changes invalidate that
+evidence, even if the new policy is also byte-preserving. The State Engine does
+not change Git configuration or weaken ordinary handoff checks. Fetch `origin` before:
 
 ```python
 from aivideo.handoff import capture_bootstrap_base
