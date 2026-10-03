@@ -6,6 +6,47 @@ formatting and newline. Callers supply a complete next document, the expected
 revision/hash, and a unique transaction ID. The engine enforces one revision
 increment and validates `next_action` as a nonempty string.
 
+## Revision-zero bootstrap
+
+`StateEngine.bootstrap(initial_document, *, handoff_base=None)` is the public
+path for creating a new canonical project. Supply a complete current-schema
+document with `state_revision == 0`, valid project identity, modes, collections
+and a nonempty `next_action`. Do not manually create/copy canonical files or
+use an import/migration transaction to manufacture an initial snapshot. The
+engine preserves the supplied document; it adds no approval, evidence or
+provider metadata and performs no provider or network execution.
+
+Revision 0 is the **genesis snapshot**. Its `events.jsonl` is zero bytes. There
+is no `-1 -> 0` event, no invented pre-state hash and no transaction journal
+for bootstrap. The first ordinary transaction creates the `0 -> 1` event,
+binding the exact genesis project hash as its before-hash.
+
+Under the existing project-local OS writer lock, bootstrap:
+
+1. validates the candidate before creating canonical files;
+2. refuses any pending journal (without recovery), nonempty history, malformed
+   or conflicting canonical files, and canonical file symlinks/directories;
+3. verifies explicit bootstrap handoff evidence when `repo` is configured;
+4. atomically materializes empty `events.jsonl` if absent;
+5. atomically materializes the validated revision-zero `project.yaml`;
+6. re-reads and runs canonical consistency checks before returning a snapshot.
+
+An absent project with absent or zero-byte history is uninitialized. A process
+crash between steps 4 and 5 therefore leaves a safely retryable prepared state.
+A crash after step 5 already leaves consistent genesis. Retry the same public
+bootstrap call, including its original Git evidence when applicable.
+
+If the project already exists, only an exact retry succeeds: current schema,
+revision zero, present zero-byte history and exact project bytes equal to the
+engine's deterministic serialization of the requested initial document. Key
+order in the input dictionary does not matter; existing formatting/newline
+differences do. Exact retry returns the existing snapshot without canonical
+writes (lock metadata is still updated). All other initialized projects are
+preserved and rejected, including an exact project with missing history, later
+revisions, older/newer schemas, different candidates and pending transactions.
+
+For a complete API example, see [Create a new project safely](../../README.md#create-a-new-project-safely).
+
 ## Write protocol
 
 1. Acquire the project-local OS byte-range lock. Windows uses
@@ -72,6 +113,47 @@ Only one workstation may be the writer. A local OS lock does not serialize
 other machines, and a stale tracking ref cannot detect an unfetched remote
 advance. Handoff requires an operator checkpoint, push, fetch, and exact base
 verification. There is no remote distributed lock in I1.
+
+For the empty canonical lifecycle, use `capture_bootstrap_base(repo_root,
+project_dir)` after fetching `origin`, then pass that evidence as
+`handoff_base` to `bootstrap`. Capture and verification require an attached
+branch, actual Git worktree root, remote URL fingerprint, local HEAD equal to
+the fetched `origin/<branch>`, and neither canonical file present in the
+committed base. Evidence also binds the repository-relative project location.
+The working project must be absent and history absent or zero bytes at capture;
+verification permits a matching genesis snapshot only for exact retry. A
+competing initialization, pending journal, changed identity/branch/HEAD or
+different fetched remote base fails closed. Deleting canonical files locally
+does not make an occupied committed base eligible for bootstrap.
+
+Retain the original bootstrap evidence for retries; do not capture new empty-base
+evidence after genesis exists. Commit/push genesis and fetch before capturing
+ordinary `capture_handoff_base` evidence for the first Git-backed transaction.
+This preserves the existing ordinary committed-base anchor. Before accepting
+bootstrap evidence, both capture and verification query `git check-attr -z`
+for `text`, `eol`, `crlf`, `filter`, `ident` and `working-tree-encoding` on the
+two repository-relative canonical paths. This checks effective attributes,
+including nested attribute files and Git's local/global attribute overrides.
+Each path must have `text=unset` (explicit `-text`), which disables Git text/
+line-ending conversion regardless of `core.autocrlf`, `eol` or legacy `crlf`.
+The independent `filter`, `ident` and `working-tree-encoding` conversions must
+be unset or unspecified. Bootstrap rejects any other policy before creating
+canonical files; no clean/smudge filter command is invoked to perform this check.
+
+Bootstrap evidence version `1.1` binds the complete effective values under
+`canonical_attributes`. Verification re-queries them and rejects any changed
+values, including a change to another safe policy. Evidence missing this binding
+is rejected. Exact retries also recheck attributes before returning genesis.
+Commit `project.yaml -text` and `events.jsonl -text` patterns in the base's
+`.gitattributes`; bootstrap does not configure Git or normalize canonical bytes.
+Ordinary handoff behavior remains unchanged. Regression coverage tests missing
+`-text` with `core.autocrlf=true`, both paths independently, nested/local overrides,
+other byte conversions, changed attributes and exact retry. The successful Git
+fixture uses `core.autocrlf=true` with `-text` and tests the first ordinary
+transaction after checkpointing genesis. Bootstrap handoff
+uses local Git reads only: an **unfetched** remote advance cannot be detected,
+and capture is not a reservation or remote lock. The single-active-workstation
+and operator-fetch rules still apply.
 
 ## Durability limits
 

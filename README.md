@@ -92,6 +92,73 @@ require this evidence and compare it to the local HEAD and fetched
 The operator must fetch before cross-machine handoff; a local tracking ref
 cannot prove live remote freshness.
 
+## Create a new project safely
+
+Use the public State Engine API to initialize an empty project directory.
+With `src` on the Python import path (`PYTHONPATH=src`):
+
+```python
+from pathlib import Path
+from aivideo.state_engine import StateEngine, TransactionRequest
+
+initial = {
+    "schema_version": "2.0", "template_version": "2.0",
+    "project_id": "new-project", "state_revision": 0,
+    "mode": "NEW_PRODUCTION", "interaction_mode": "DISCOVERY",
+    "next_action": "Review the brief",
+    "assets": [], "shots": [], "dependencies": [],
+}
+engine = StateEngine(Path("projects/new-project"))
+genesis = engine.bootstrap(initial)
+assert engine.inspect_consistency() == genesis
+assert engine.inspect_history() == ()
+
+after = {**initial, "state_revision": 1, "next_action": "Review storyboard"}
+snapshot = engine.begin_transaction(
+    TransactionRequest(0, genesis.project_hash, "edit-1", "author", "EDIT"),
+    after,
+)
+```
+
+The engine creates both canonical files. Revision 0 is genesis with zero-byte
+history; the transaction above creates the first `0 -> 1` event. Bootstrap is
+retryable after interruption and an exact retry returns genesis without
+canonical writes. Existing conflicting/initialized state is never overwritten.
+
+For Git-backed bootstrap, the repository must already have a noncanonical base
+commit on an attached branch published to `origin`. Preserve canonical exact
+bytes across Git checkpoints: include these patterns in the base commit's
+`.gitattributes` (they apply to matching filenames in subdirectories too):
+
+```gitattributes
+project.yaml -text
+events.jsonl -text
+```
+
+Bootstrap capture and verification enforce the effective attributes of both
+canonical paths before canonical writes: `text` must be unset (explicit
+`-text`), and `filter`, `ident` and `working-tree-encoding` must be unset or
+unspecified. Missing `-text` is rejected, including with `core.autocrlf=true`.
+Bootstrap evidence binds the effective attributes; changes invalidate that
+evidence, even if the new policy is also byte-preserving. The State Engine does
+not change Git configuration or weaken ordinary handoff checks. Fetch `origin` before:
+
+```python
+from aivideo.handoff import capture_bootstrap_base
+
+repo = Path("project-repository")
+project = repo / "project"
+base = capture_bootstrap_base(repo, project)
+engine = StateEngine(project, repo=repo)
+genesis = engine.bootstrap(initial, handoff_base=base)
+```
+
+Retain `base` for exact retries. Commit/push genesis and fetch before using
+`capture_handoff_base` for ordinary Git-backed transactions. Bootstrap checks
+the fetched remote/base and committed canonical-file absence; it provides no
+remote lock or live freshness check. Follow the single-workstation handoff
+policy in [the handoff contract](docs/interfaces/cross-machine-handoff-v0.1.md).
+
 I2 adds read-only validators, G0–G6 gate evaluation, and action guards. See
 `docs/implementation/phase-i2-validation-gates.md` for the fields, evidence
 binding, APIs, and action permissions. I3 adds offline Router/Ticket/provider
