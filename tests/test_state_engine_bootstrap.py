@@ -234,8 +234,12 @@ class GitBootstrapTests(unittest.TestCase):
         self.git("init", "-b", "main")
         self.git("config", "user.email", "test@example.invalid")
         self.git("config", "user.name", "Test")
+        # Exercise the Windows default while preserving canonical exact bytes.
+        # This noncanonical policy is committed before bootstrap, not a state edit.
+        self.git("config", "core.autocrlf", "true")
+        (self.repo / ".gitattributes").write_bytes(b"project.yaml -text\nevents.jsonl -text\n")
         (self.repo / "marker").write_text("base", encoding="utf-8")
-        self.git("add", "marker")
+        self.git("add", "marker", ".gitattributes")
         self.git("commit", "-m", "empty canonical base")
         self.remote = self.path / "remote.git"
         subprocess.run(["git", "init", "--bare", str(self.remote)], check=True, capture_output=True)

@@ -130,6 +130,13 @@ Retain the original bootstrap evidence for retries; do not capture new empty-bas
 evidence after genesis exists. Commit/push genesis and fetch before capturing
 ordinary `capture_handoff_base` evidence for the first Git-backed transaction.
 This preserves the existing ordinary committed-base anchor. Bootstrap handoff
+also retains ordinary exact-byte requirements: commit `project.yaml -text` and
+`events.jsonl -text` patterns in the repository's `.gitattributes` before
+bootstrap to preserve canonical bytes when Git's `core.autocrlf` is enabled.
+Git text conversion can otherwise make the post-checkpoint ordinary handoff
+fail closed; bootstrap does not configure Git or normalize canonical bytes.
+The Git regression fixture enables `core.autocrlf=true` and commits this policy
+before testing genesis and the first ordinary transaction. Bootstrap handoff
 uses local Git reads only: an **unfetched** remote advance cannot be detected,
 and capture is not a reservation or remote lock. The single-active-workstation
 and operator-fetch rules still apply.

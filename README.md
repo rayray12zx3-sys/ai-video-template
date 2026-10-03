@@ -126,7 +126,18 @@ retryable after interruption and an exact retry returns genesis without
 canonical writes. Existing conflicting/initialized state is never overwritten.
 
 For Git-backed bootstrap, the repository must already have a noncanonical base
-commit on an attached branch published to `origin`. Fetch `origin` before:
+commit on an attached branch published to `origin`. Preserve canonical exact
+bytes across Git checkpoints: include these patterns in the base commit's
+`.gitattributes` (they apply to matching filenames in subdirectories too):
+
+```gitattributes
+project.yaml -text
+events.jsonl -text
+```
+
+Automatic LF/CRLF conversion changes canonical hashes and can make an ordinary
+handoff conflict after checkpointing. The State Engine does not change Git
+configuration or weaken exact-byte verification. Fetch `origin` before:
 
 ```python
 from aivideo.handoff import capture_bootstrap_base
