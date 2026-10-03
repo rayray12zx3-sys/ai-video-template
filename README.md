@@ -12,7 +12,8 @@ Provider-neutral AI video production template: design baseline, implementation, 
 **Current blockers:** strict/provider-effective parameters and trusted task/asset/workspace/charge-refund linkage unresolved; maintained Plugin source/deployment and B2 spend remain blocked<br>
 **Next action:** obtain supported strict/final-parameter and receipt contracts or a safe existing sample from a confirmed intended workspace; no live adapter or paid smoke<br>
 **Verification:** #15: 16 isolated runtime/dependency diagnostics and 5 repository fail-closed tests PASS; 9 final read-only queries; ordinary T2V POST no-retry proven only within the inspected client path; not B1 equivalence or GitHub Actions PASS<br>
-**Last verified:** 2026-10-01
+**Audit hardening candidate:** trusted human gate verification, composite substep coverage, and Ubuntu/Python 3.12 CI are under review; production trust enrollment remains external. This does not change I8 provider/spend blockers.
+**Last verified:** 2026-10-04 (local audit checks; hosted CI tracked in the candidate PR)
 
 ```text
 ✅ I0–I5a  Baseline / validation foundation
@@ -76,7 +77,7 @@ If Windows provides the Python launcher but no `python` command, use
 `py -3 -B -m unittest discover -s tests -v` and
 `py -3 -B scripts/capture_environment.py` instead.
 
-Tests use only the Python standard library and do not contact or invoke providers.
+Core tests use the Python standard library. Signed-approval tests additionally require `python -m pip install -r requirements-approval.txt`. Tests do not contact or invoke providers.
 `scripts/capture_environment.py` prints an allowlisted tool-version snapshot. To keep
 it locally, redirect output to `environment-snapshot.local.json`, which Git ignores.
 Unavailable tools appear as `null`; they do not need installation for I1.
@@ -159,7 +160,7 @@ the fetched remote/base and committed canonical-file absence; it provides no
 remote lock or live freshness check. Follow the single-workstation handoff
 policy in [the handoff contract](docs/interfaces/cross-machine-handoff-v0.1.md).
 
-I2 adds read-only validators, G0–G6 gate evaluation, and action guards. See
+I2 adds read-only validators, G0–G6 gate evaluation, and action guards. Human gates require a trusted verifier; see `docs/governance/trusted-operator-approval-v1.md`. See
 `docs/implementation/phase-i2-validation-gates.md` for the fields, evidence
 binding, APIs, and action permissions. I3 adds offline Router/Ticket/provider
 execution contracts; see `docs/implementation/phase-i3-router-tickets.md`.

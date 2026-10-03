@@ -140,3 +140,9 @@ Closeout evidence:
 - untrusted-fork safety is fail-closed by workflow design: no provider secrets, no paid execution, no self-hosted runners, no pull_request_target
 
 The public canonical repository is now the active development repository. The former private repository remains archive/ops evidence only.
+
+## Offline audit hardening candidate (2026-10-04)
+
+REQUIRED_NOW within this bounded audit: reject fabricated HUMAN gate evidence, cover composite generation/lip-sync substeps, preserve State Engine-only adoption and add an Ubuntu/Python 3.12 CI lane. Implementation is a PR candidate; local synthetic regression is separate from hosted CI and production approval.
+
+Active path: exact-head offline tests → independent safety review → hosted matrix CI → review. Production signing-key enrollment and human action provenance remain external deployment prerequisites. I8 provider/workspace/spend/receipt blockers above are unchanged and no provider action is authorized. Exit: required offline/hosted checks pass and the trusted runtime deployment is accepted; no milestone-completion percentage is inferred.

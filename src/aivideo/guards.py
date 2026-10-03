@@ -89,6 +89,10 @@ def guard_action(engine, request: ActionRequest, *, now=None, preflight_verifier
     if snapshot is None:
         return {"action": request.action, "decision": "DENY", "blocking_findings": errors}
     doc = snapshot.document
+    policy = doc.get("execution_policy", {})
+    policy = policy if isinstance(policy, dict) else {}
+    if request.action in {"PAID_GENERATION", "BATCH_GENERATION"} and policy.get("paid_generation") == "FORBIDDEN":
+        errors.append(finding("PAID_EXECUTION_FORBIDDEN", "Canonical execution policy forbids paid generation"))
     if request.expected_state_revision != snapshot.state_revision or request.expected_project_hash != snapshot.project_hash:
         errors.append(finding("STALE_ACTION", "Action state revision/hash differs from canonical state"))
     if not request.action_id:
@@ -101,7 +105,7 @@ def guard_action(engine, request: ActionRequest, *, now=None, preflight_verifier
         for asset_id in request.asset_ids:
             errors.extend(_upload(doc, snapshot, asset_id, request, now, approval_verifier))
     if request.action in {"PAID_GENERATION", "BATCH_GENERATION"}:
-        gates = evaluate_gates(engine)
+        gates = evaluate_gates(engine, approval_verifier=approval_verifier)
         gate_id = "G5" if request.action == "BATCH_GENERATION" else "G4"
         if gates[gate_id]["status"] != "PASS":
             errors.append(finding("GATE_NOT_READY", f"{gate_id} must pass before this action"))
