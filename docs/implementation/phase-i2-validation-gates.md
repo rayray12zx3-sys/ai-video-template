@@ -48,7 +48,7 @@ is written through a State Engine transaction with its final subject content.
   an edge to an existing dependent needs `dependency_changes` audit metadata
   and invalidates that dependent. Remediation of a stale dependent needs a
   later audited approval transition.
-- `gates.evaluate_gates(engine)` derives G0–G6 with `PASS`, `FAIL`, `BLOCKED`,
+- `gates.evaluate_gates(engine, approval_verifier=trusted_verifier)` derives G0–G6 with `PASS`, `FAIL`, `BLOCKED`,
   or `NOT_APPLICABLE`, blocking/nonblocking findings, required evidence, and the next
   remediation. The output is a report, not canonical state.
 - `guards.guard_action(engine, ActionRequest(...))` returns `ALLOW` or `DENY`.
@@ -63,7 +63,7 @@ is written through a State Engine transaction with its final subject content.
 | G1 MASTER_ASSETS_APPROVED | `REQUIRED_FOR_STORYBOARD` assets approved and materialized with human `ASSET_APPROVAL` |
 | G2 STORYBOARD_APPROVED | Storyboard, complete required shots, human `STORYBOARD_APPROVAL` bound to required shots; omissions need human approval |
 | G3 STATIC_ANIMATIC_APPROVED | Animatic, human `ANIMATIC_APPROVAL` bound to storyboard and required animatic assets |
-| G4 GENERATION_READY | Required generative shots (`AUTO`, `AI_IMAGE`, `AI_VIDEO`), machine `GENERATION_READINESS` bound to their input assets, approved inputs, upload policy readiness, and required generation assets |
+| G4 GENERATION_READY | Required generative shots (`AUTO`, `AI_IMAGE`, `AI_VIDEO`, explicit generation substeps, and unresolved required/conditional lip-sync), machine `GENERATION_READINESS` bound to their input assets, approved inputs, upload policy readiness, and required generation assets |
 | G5 BATCH_GENERATION_ALLOWED | Generation plan and human `BATCH_APPROVAL` bound to required shots |
 | G6 FINAL_QC_APPROVED | Separate technical PASS and creative APPROVED states, human `FINAL_QC_APPROVAL`, and required delivery assets |
 
@@ -96,3 +96,7 @@ identity proof. No I2 API submits to a provider or spends credits.
 
 `python -B -m unittest discover -s tests -v` uses temporary projects. It does
 not mutate checked-in examples or contact providers.
+
+## Audit hardening
+
+Every human gate requires a verifier of the exact matching evidence/snapshot, with no default trust. Guard callbacks now support both gate `(evidence, snapshot)` and existing action `(kind, subject, request, snapshot)` calls. See [trusted operator approval](../governance/trusted-operator-approval-v1.md) and [composite generation contracts](../governance/composite-generation-contract-v1.md). Old unsigned evidence is never silently adopted.

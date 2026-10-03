@@ -58,7 +58,7 @@ class I3Tests(unittest.TestCase):
         return i2_fixture.I2Tests.trusted_preflight(request, snapshot, now)
 
     @staticmethod
-    def _mock_approval(kind, subject, request, snapshot):
+    def _mock_approval(*args):
         return True
 
     def approve_spend(self, ticket, candidate_id="candidate-a"):

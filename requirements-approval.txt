@@ -1,0 +1,2 @@
+# Optional operator signature verification; core State Engine remains stdlib-only.
+cryptography==50.0.1

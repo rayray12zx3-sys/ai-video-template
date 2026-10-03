@@ -57,7 +57,8 @@ def subjects(document):
 def evidence_status(document, *, kind, subject, snapshot, human=False, action_id=None,
                     provider=None, ticket_id=None, candidate_id=None, shot_id=None,
                     workspace_id=None, max_cost=None, exact_revision=False,
-                    required_bindings=(), now=None):
+                    required_bindings=(), now=None, approval_verifier=None,
+                    require_trusted=False):
     """Return (valid, reason). Approvals bind to exact canonical subject hashes."""
     target = subjects(document).get(subject)
     if target is None:
@@ -111,8 +112,15 @@ def evidence_status(document, *, kind, subject, snapshot, human=False, action_id
             continue
         if any(ref not in bindings for ref in required_bindings):
             continue
+        if human and require_trusted:
+            try:
+                trusted = approval_verifier is not None and approval_verifier(item, snapshot) is True
+            except Exception:
+                trusted = False
+            if not trusted:
+                continue
         return True, "APPROVED"
-    return False, "STALE_OR_UNAPPROVED_EVIDENCE"
+    return False, "UNTRUSTED_OR_STALE_APPROVAL" if human and require_trusted else "STALE_OR_UNAPPROVED_EVIDENCE"
 
 
 def _asset_findings(asset, root):
@@ -182,6 +190,10 @@ def validate_project(engine: StateEngine) -> ValidationResult:
         return ValidationResult(None, (finding("CANONICAL_INTEGRITY", str(exc)),))
     doc = snapshot.document
     out = []
+    execution_policy = doc.get("execution_policy", {})
+    if (not isinstance(execution_policy, dict)
+            or execution_policy.get("paid_generation") not in (None, "APPROVAL_REQUIRED", "FORBIDDEN")):
+        out.append(finding("EXECUTION_POLICY", "Invalid paid-generation execution policy"))
     if snapshot.access != "WRITABLE_VERSION":
         out.append(finding("SCHEMA_ACCESS", f"Project access is {snapshot.access}"))
         return ValidationResult(snapshot, tuple(out))
@@ -204,14 +216,42 @@ def validate_project(engine: StateEngine) -> ValidationResult:
             if kind == "asset":
                 out.extend(_asset_findings(item, engine.project_dir))
             else:
-                if item.get("readiness", "REQUIRED") not in {"REQUIRED", "OPTIONAL", "OMITTED_BY_DESIGN"}:
+                if item.get("readiness", "REQUIRED") not in ("REQUIRED", "OPTIONAL", "OMITTED_BY_DESIGN"):
                     out.append(finding("SHOT_READINESS", "Invalid shot readiness", subject=ref))
+                if not isinstance(item.get("production_method"), (str, type(None))):
+                    out.append(finding("PRODUCTION_METHOD", "Production method must be a string", subject=ref))
+                if "lip_sync" in item and (not isinstance(item["lip_sync"], dict)
+                        or item["lip_sync"].get("status") not in ("NONE", "REQUIRED", "CONDITIONAL", "PARTIAL", "AVOIDABLE")):
+                    out.append(finding("LIP_SYNC_CONTRACT", "Lip-sync requires an object with a supported status", subject=ref))
                 inputs = item.get("input_asset_ids", [])
                 if not isinstance(inputs, list) or any(not isinstance(value, str) or not value for value in inputs):
                     out.append(finding("SHOT_INPUTS", "Shot input_asset_ids must be asset ID strings", subject=ref))
                 elif any(f"asset:{value}" not in ids for value in inputs):
                     out.append(finding("SHOT_INPUTS", "Shot references a missing input asset", subject=ref))
                 frames = item.get("duration_frames")
+                if "generation_required" in item and not isinstance(item["generation_required"], bool):
+                    out.append(finding("GENERATION_CONTRACT", "generation_required must be boolean", subject=ref))
+                if item.get("base_plate_policy") not in (None, "GENERATIVE", "APPROVED_SOURCE", "DETERMINISTIC"):
+                    out.append(finding("BASE_PLATE_POLICY", "Unknown base plate policy", subject=ref))
+                if item.get("production_method") == "COMPOSITE" and (
+                        not isinstance(item.get("generation_required"), bool) or item.get("base_plate_policy") is None):
+                    out.append(finding("GENERATION_CONTRACT", "Composite requires an explicit generation/base contract", subject=ref))
+                if item.get("base_plate_policy") == "DETERMINISTIC" and item.get("generation_required") is not False:
+                    out.append(finding("GENERATION_CONTRACT", "Deterministic compositing must explicitly exclude generation", subject=ref))
+                if item.get("base_plate_policy") == "GENERATIVE" and item.get("generation_required") is not True:
+                    out.append(finding("GENERATION_CONTRACT", "Generative base requires generation_required=true", subject=ref))
+                if item.get("base_plate_policy") == "APPROVED_SOURCE":
+                    source_id = item.get("base_plate_asset_id")
+                    source = next((a for a in doc.get("assets", []) if isinstance(a, dict) and a.get("id") == source_id), None)
+                    if (source is None or not isinstance(inputs, list) or source_id not in inputs or source.get("media_type") != "VIDEO"
+                            or source.get("lifecycle") not in {"APPROVED", "FINAL"}
+                            or source.get("origin") == "PROVIDER_OUTPUT"
+                            or item.get("generation_required") is not False):
+                        out.append(finding("BASE_PLATE_SOURCE", "Non-generative base must bind an approved source video input", subject=ref))
+                    if (isinstance(item.get("lip_sync"), dict)
+                            and item["lip_sync"].get("status") in ("REQUIRED", "CONDITIONAL", "PARTIAL", "AVOIDABLE")
+                            and item.get("lip_sync_execution") != "SOURCE_ALREADY_SYNCHRONIZED"):
+                        out.append(finding("SOURCE_SYNC_CONTRACT", "Source exemption requires already-synchronized source and human source-sync approval", subject=ref))
                 if frames is not None and (not isinstance(frames, int) or isinstance(frames, bool) or frames <= 0):
                     out.append(finding("SHOT_DURATION", "Shot duration_frames must be a positive integer", subject=ref))
     refs = subjects(doc)
@@ -221,7 +261,8 @@ def validate_project(engine: StateEngine) -> ValidationResult:
                                subject=group))
     dependency_keys = set()
     for edge in doc.get("dependencies", []):
-        if not isinstance(edge, dict) or edge.get("source") not in refs or edge.get("target") not in refs:
+        if (not isinstance(edge, dict) or not isinstance(edge.get("source"), str)
+                or not isinstance(edge.get("target"), str) or edge["source"] not in refs or edge["target"] not in refs):
             out.append(finding("DEPENDENCY_TARGET", "Dependency source/target is missing"))
         elif not isinstance(edge.get("impact", "GENERIC"), str) or edge.get("impact", "GENERIC") not in IMPACTS:
             out.append(finding("DEPENDENCY_IMPACT", "Unknown dependency impact"))
@@ -249,7 +290,8 @@ def validate_project(engine: StateEngine) -> ValidationResult:
             if not valid:
                 out.append(finding("STALE_EVIDENCE", reason, subject=item["id"]))
     for edge in doc.get("dependencies", []):
-        if not isinstance(edge, dict) or edge.get("source") not in refs or edge.get("target") not in refs:
+        if (not isinstance(edge, dict) or not isinstance(edge.get("source"), str)
+                or not isinstance(edge.get("target"), str) or edge["source"] not in refs or edge["target"] not in refs):
             continue
         source = refs[edge["source"]]
         target = refs[edge["target"]]

@@ -108,11 +108,11 @@ class I2Tests(unittest.TestCase):
 
     def guard(self, request, **kwargs):
         return guard_action(self.engine, request, preflight_verifier=self.trusted_preflight,
-                            approval_verifier=lambda kind, subject, action, snapshot: True, **kwargs)
+                            approval_verifier=lambda *args: True, **kwargs)
 
     def test_each_gate_passes_with_minimum_evidence(self):
         self.assertTrue(validate_project(self.engine).ok)
-        self.assertEqual({gate: report["status"] for gate, report in evaluate_gates(self.engine).items()},
+        self.assertEqual({gate: report["status"] for gate, report in evaluate_gates(self.engine, approval_verifier=lambda *args: True).items()},
                          {f"G{i}": "PASS" for i in range(7)})
 
     def test_each_gate_missing_mandatory_prerequisite(self):
@@ -133,7 +133,7 @@ class I2Tests(unittest.TestCase):
                 else:
                     doc.pop(field)
                 (self.root / "project.yaml").write_text(json.dumps(doc), encoding="utf-8")
-                report = evaluate_gates(self.engine)[gate]
+                report = evaluate_gates(self.engine, approval_verifier=lambda *args: True)[gate]
                 self.assertNotEqual(report["status"], "PASS")
                 self.assertIn(code, [f["code"] for f in report["blocking_findings"]])
                 self.write_initial()
@@ -316,7 +316,7 @@ class I2Tests(unittest.TestCase):
         self.commit(lambda doc: (doc["assets"].append({"id": "optional-input", "lifecycle": "EXPECTED",
             "criticality": "OPTIONAL"}), doc["shots"].append({"id": "optional-shot", "readiness": "OPTIONAL",
             "input_asset_ids": ["optional-input"]})))
-        self.assertEqual(evaluate_gates(self.engine)["G4"]["status"], "PASS")
+        self.assertEqual(evaluate_gates(self.engine, approval_verifier=lambda *args: True)["G4"]["status"], "PASS")
         before = self.engine.read()
         after = copy.deepcopy(before.document)
         after["state_revision"] += 1
@@ -339,7 +339,7 @@ class I2Tests(unittest.TestCase):
             self.engine.begin_transaction(request, after, transition_metadata=audit)
         after["shots"][0]["status"] = "STALE"
         self.engine.begin_transaction(request, after, transition_metadata=audit)
-        self.assertNotEqual(evaluate_gates(self.engine)["G2"]["status"], "PASS")
+        self.assertNotEqual(evaluate_gates(self.engine, approval_verifier=lambda *args: True)["G2"]["status"], "PASS")
 
     def test_editorial_shot_does_not_require_generation_gates(self):
         self.doc["shots"][0]["production_method"] = "NO_NEW_MEDIA"
@@ -354,7 +354,7 @@ class I2Tests(unittest.TestCase):
                      if item["kind"] == "BATCH_APPROVAL")
         batch["dependency_hashes"]["shot:shot-a"] = fingerprint(self.doc["shots"][0])
         self.write_initial()
-        report = evaluate_gates(self.engine)
+        report = evaluate_gates(self.engine, approval_verifier=lambda *args: True)
         self.assertEqual(report["G4"]["status"], "NOT_APPLICABLE")
         self.assertEqual(report["G5"]["status"], "NOT_APPLICABLE")
         self.assertEqual(report["G6"]["status"], "PASS")
@@ -375,7 +375,7 @@ class I2Tests(unittest.TestCase):
                 action_id=action, provider="example", ticket_id=ticket, candidate_id="candidate-a",
                 shot_id=shot["id"], workspace_id="ws-1", max_cost=2))
         self.write_initial()
-        self.assertEqual(evaluate_gates(self.engine)["G4"]["status"], "PASS")
+        self.assertEqual(evaluate_gates(self.engine, approval_verifier=lambda *args: True)["G4"]["status"], "PASS")
         for shot, action, ticket in ((editorial, "edit-action", "edit-ticket"),
                                      (optional, "optional-action", "optional-ticket")):
             with self.subTest(shot=shot["id"]):
@@ -387,7 +387,7 @@ class I2Tests(unittest.TestCase):
     def test_pending_journal_blocks_read_only_evaluation(self):
         (self.root / ".pending-transaction.json").write_text("{}", encoding="utf-8")
         self.assertFalse(validate_project(self.engine).ok)
-        self.assertEqual(evaluate_gates(self.engine)["G0"]["status"], "BLOCKED")
+        self.assertEqual(evaluate_gates(self.engine, approval_verifier=lambda *args: True)["G0"]["status"], "BLOCKED")
         self.assertEqual(guard_action(self.engine, self.request())["decision"], "DENY")
         self.assertTrue((self.root / ".pending-transaction.json").exists())
 
@@ -409,20 +409,20 @@ class I2Tests(unittest.TestCase):
 
     def test_stale_evidence_hash_and_derived_report_are_non_authoritative(self):
         before = self.engine.read()
-        gates = evaluate_gates(self.engine)
+        gates = evaluate_gates(self.engine, approval_verifier=lambda *args: True)
         (self.root / "STATUS.md").write_text("All gates passed", encoding="utf-8")
         (self.root / "STATUS.md").write_text("All gates failed", encoding="utf-8")
         self.assertEqual(self.engine.read().project_hash, before.project_hash)
-        self.assertEqual(evaluate_gates(self.engine), gates)
+        self.assertEqual(evaluate_gates(self.engine, approval_verifier=lambda *args: True), gates)
         self.commit(lambda doc: doc["brief"].update(intent="Changed intent"))
         self.assertFalse(validate_project(self.engine).ok)
-        self.assertNotEqual(evaluate_gates(self.engine)["G0"]["status"], "PASS")
+        self.assertNotEqual(evaluate_gates(self.engine, approval_verifier=lambda *args: True)["G0"]["status"], "PASS")
 
     def test_materialization_hash_and_read_only_evaluators(self):
         before = self.engine.project_path.read_bytes()
         events = self.engine.events_path.read_bytes()
         validate_project(self.engine)
-        evaluate_gates(self.engine)
+        evaluate_gates(self.engine, approval_verifier=lambda *args: True)
         guard_action(self.engine, self.request())
         self.assertEqual(self.engine.project_path.read_bytes(), before)
         self.assertEqual(self.engine.events_path.read_bytes(), events)

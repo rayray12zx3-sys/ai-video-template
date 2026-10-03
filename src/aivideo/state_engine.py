@@ -515,10 +515,28 @@ class StateEngine:
 
     def begin_transaction(self, request: TransactionRequest, after_document: dict | None = None,
                           *, transition_metadata: dict | None = None):
-        if request.event_type == "IMPORT_ADOPTION":
-            raise ValueError("IMPORT_ADOPTION requires the dedicated adoption path")
+        if request.event_type in {"IMPORT_ADOPTION", "HUMAN_APPROVAL_ADOPTED"}:
+            raise ValueError("reserved adoption event requires the dedicated adoption path")
         with self.lock.acquire(request.transaction_id):
             return self._commit_locked(request, after_document, transition_metadata, None)
+
+    def commit_approval_adoption(self, request, envelope, verifier):
+        """Verify and append exactly one signed approval under the writer lock."""
+        if request.event_type != "HUMAN_APPROVAL_ADOPTED":
+            raise ValueError("approval adoption requires its reserved event type")
+        from .approvals import _plan_approval_adoption
+        from .validators import fingerprint
+        with self.lock.acquire(request.transaction_id):
+            self._recover_locked()
+            before = self.read()
+            self._check_consistency(before, self._events())
+            after, payload = _plan_approval_adoption(before, envelope, verifier)
+            if request.actor != payload["actor_id"]:
+                raise StateConflict("approval actor does not match trusted receipt")
+            return self._commit_locked(request, after,
+                {"operator_event_id": payload["operator_event_id"],
+                 "approval_payload_hash": fingerprint(payload),
+                 "adopted_evidence_hash": fingerprint(after["evidence"][-1])}, None)
 
     def preview_import_adoption(self, request: TransactionRequest, source_fixture: dict,
                                 candidate: dict, report: dict) -> ImportAdoptionPlan:
