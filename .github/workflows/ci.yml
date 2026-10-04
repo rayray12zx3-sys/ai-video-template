@@ -18,13 +18,16 @@ concurrency:
 
 jobs:
   test:
-    name: Windows / Python ${{ matrix.python-version }}
-    runs-on: windows-latest
+    name: ${{ matrix.os-label }} / Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.14"]
+        include:
+          - {os: windows-latest, os-label: Windows, python-version: "3.11"}
+          - {os: windows-latest, os-label: Windows, python-version: "3.14"}
+          - {os: ubuntu-24.04, os-label: Ubuntu, python-version: "3.12"}
 
     steps:
       - name: Checkout
@@ -36,6 +39,9 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: ${{ matrix.python-version }}
+
+      - name: Install approval verification dependency
+        run: python -m pip install -r requirements-approval.txt
 
       - name: Compile
         run: python -B -m compileall -q src scripts tests
