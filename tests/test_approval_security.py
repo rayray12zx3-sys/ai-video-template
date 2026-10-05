@@ -6,7 +6,8 @@ import unittest
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 import test_i2_validation as fixture
-from aivideo.approvals import (AttestedApprovalVerifier, SignedApprovalVerifier,\n                               adopt_approval, approval_bytes)
+from aivideo.approvals import (AttestedApprovalVerifier, SignedApprovalVerifier,
+                               adopt_approval, approval_bytes)
 from aivideo.gates import evaluate_gates, _generative_shots
 from aivideo.state_engine import StateConflict
 from aivideo.validators import fingerprint, validate_project
