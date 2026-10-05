@@ -6,10 +6,11 @@ import unittest
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 import test_i2_validation as fixture
-from aivideo.approvals import SignedApprovalVerifier, adopt_approval, approval_bytes
+from aivideo.approvals import (AttestedApprovalVerifier, SignedApprovalVerifier,
+                               adopt_approval, approval_bytes)
 from aivideo.gates import evaluate_gates, _generative_shots
 from aivideo.state_engine import StateConflict
-from aivideo.validators import validate_project
+from aivideo.validators import fingerprint, validate_project
 
 
 class ApprovalSecurityTests(unittest.TestCase):
@@ -51,6 +52,88 @@ class ApprovalSecurityTests(unittest.TestCase):
         self.assertEqual(evaluate_gates(self.f.engine, approval_verifier=self.verifier)['G0']['status'], 'PASS')
         with self.assertRaises(StateConflict):
             adopt_approval(self.f.engine, envelope, self.verifier, transaction_id='replay')
+
+    def attested_envelope(self, kind='BRIEF_LOCK', subject='project:brief', **changes):
+        payload = self.envelope(kind, subject, **changes)['payload']
+        return {
+            'backend': 'PLATFORM_ATTESTATION',
+            'payload': payload,
+            'attestation': {
+                'decision': 'APPROVE',
+                'payload_hash': fingerprint(payload),
+                'explicit_user_action': True,
+            },
+        }
+
+    @staticmethod
+    def synthetic_attestation(attestation, payload):
+        return attestation == {
+            'decision': 'APPROVE',
+            'payload_hash': fingerprint(payload),
+            'explicit_user_action': True,
+        }
+
+    def test_platform_attested_adoption_uses_same_reserved_history_path(self):
+        verifier = AttestedApprovalVerifier(
+            self.synthetic_attestation,
+            audience='synthetic-private-workflow',
+            actor_id='operator',
+            history_reader=self.f.engine.inspect_history,
+        )
+        envelope = self.attested_envelope()
+        before = self.f.engine.read()
+        result = adopt_approval(
+            self.f.engine, envelope, verifier, transaction_id='attested-adopt-event')
+        self.assertEqual(result.state_revision, before.state_revision + 1)
+        self.assertEqual(self.f.engine.inspect_history()[-1]['event_type'],
+                         'HUMAN_APPROVAL_ADOPTED')
+        evidence = result.document['evidence'][-1]
+        self.assertTrue(verifier(evidence, result))
+        self.assertEqual(
+            evaluate_gates(self.f.engine, approval_verifier=verifier)['G0']['status'],
+            'PASS')
+        no_history = AttestedApprovalVerifier(
+            self.synthetic_attestation,
+            audience='synthetic-private-workflow',
+            actor_id='operator',
+        )
+        self.assertFalse(no_history(evidence, result))
+
+    def test_platform_attestation_rejects_agent_forgeable_surrogates(self):
+        envelope = self.attested_envelope()
+        for callback in (
+            lambda attestation, payload: False,
+            lambda attestation, payload: 1,
+            lambda attestation, payload: (_ for _ in ()).throw(ValueError()),
+        ):
+            verifier = AttestedApprovalVerifier(
+                callback,
+                audience='synthetic-private-workflow',
+                actor_id='operator',
+                history_reader=self.f.engine.inspect_history,
+            )
+            self.assertIsNone(verifier.payload(envelope))
+
+        verifier = AttestedApprovalVerifier(
+            self.synthetic_attestation,
+            audience='synthetic-private-workflow',
+            actor_id='operator',
+            history_reader=self.f.engine.inspect_history,
+        )
+        github_comment = {
+            'payload': envelope['payload'],
+            'user': {'login': 'operator'},
+            'body': 'APPROVE',
+        }
+        self.assertIsNone(verifier.payload(github_comment))
+
+        wrong_actor = copy.deepcopy(envelope)
+        wrong_actor['payload']['actor_id'] = 'agent'
+        self.assertIsNone(verifier.payload(wrong_actor))
+
+        wrong_audience = copy.deepcopy(envelope)
+        wrong_audience['payload']['audience'] = 'another-workflow'
+        self.assertIsNone(verifier.payload(wrong_audience))
 
     def test_generic_transaction_cannot_forge_adoption_event(self):
         from aivideo.state_engine import TransactionRequest
